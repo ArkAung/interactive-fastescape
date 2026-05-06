@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fast Escape, Slow Convergence — interactive</title>
+<title>Fast Escape, Slow Convergence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -129,14 +129,14 @@ figure.widget .controls label { white-space: nowrap; }
 <div class="container">
   <header class="masthead">
     <h1>Fast Escape, Slow Convergence</h1>
-    <p class="byline">After Braun, Loureiro, Minh, Imaizumi · arXiv:<a href="https://arxiv.org/abs/2511.18661">2511.18661</a></p>
+    <p class="byline">Braun, Loureiro, Minh, Imaizumi &middot; arXiv:<a href="https://arxiv.org/abs/2511.18661">2511.18661</a></p>
   </header>
 
   <main id="main">
 
     <section id="s0">
       <h2><span class="num">§0</span>Five training runs</h2>
-      <p class="lede">Same gradient flow. Same loss. Same noise. The only thing that changes between these five curves is <em>a</em> &mdash; the exponent of a power law that says how much variance the data has in each direction.</p>
+      <p class="lede">Five gradient flows on the same phase retrieval loss. They differ only in the data&rsquo;s covariance spectrum: &lambda;<sub>i</sub> &prop; i<sup>&minus;a</sup>, for five values of <em>a</em>.</p>
 
       <figure class="widget" id="hook">
         <svg viewBox="0 0 720 380"></svg>
@@ -146,7 +146,7 @@ figure.widget .controls label { white-space: nowrap; }
         </div>
       </figure>
 
-      <p class="caption">Drag <em>a</em>. The curve starts dropping earlier and finishes later. The rest of the page is about why.</p>
+      <p class="caption">Slide <em>a</em>. Larger <em>a</em> &mdash; a more skewed spectrum &mdash; gives an earlier drop and a flatter tail. The escape is faster; the convergence is slower.</p>
     </section>
 
   </main>
@@ -333,7 +333,7 @@ function renderHook(root) {
   // Legend (upper-right; that quadrant of the plot is empty)
   const legend = g.append('g').attr('transform', `translate(${iw - 88},6)`);
   legend.append('rect')
-    .attr('x', -8).attr('y', -4).attr('width', 92).attr('height', refs.length * 16 + 26)
+    .attr('x', -8).attr('y', -4).attr('width', 92).attr('height', refs.length * 16 + 10)
     .attr('fill', '#fbf9f3').attr('stroke', '#d9d3c2');
   refs.forEach((r, i) => {
     const row = legend.append('g').attr('transform', `translate(0,${i * 16 + 8})`);
@@ -341,10 +341,6 @@ function renderHook(root) {
     row.append('text').attr('x', 24).attr('y', 4).attr('class', 'curve-label').attr('fill', '#333')
       .text(`a = ${r.a.toFixed(2)}`);
   });
-  const dragRow = legend.append('g').attr('transform', `translate(0,${refs.length * 16 + 12})`);
-  dragRow.append('line').attr('x1', 0).attr('x2', 18).attr('stroke', '#1a1a1f').attr('stroke-width', 2.6);
-  dragRow.append('text').attr('x', 24).attr('y', 4).attr('class', 'curve-label')
-    .attr('fill', '#1a1a1f').attr('font-style', 'italic').text('your a');
 
   const liveG = g.append('g');
   const slider = root.querySelector('input[type="range"]');
