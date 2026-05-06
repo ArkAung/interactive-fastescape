@@ -179,6 +179,29 @@ figure.widget .controls label { white-space: nowrap; }
       <p class="caption">Slide <em>a</em>. The spectrum steepens, the data cloud flattens, and the learning curve drops earlier but plateaus longer.</p>
     </section>
 
+    <section id="s1">
+      <h2><span class="num">&sect;1</span>The loss</h2>
+
+      <p class="lede">In phase retrieval, each observation is y = &lang;x, w<sup>&star;</sup>&rang;<sup>2</sup> + &xi;. The squared inner product loses the sign, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce identical data. The loss inherits that: two equivalent minima.</p>
+
+      <p>The population loss is L(w) = E<sub>x</sub>[(&lang;x,w&rang;<sup>2</sup> &minus; &lang;x,w<sup>&star;</sup>&rang;<sup>2</sup>)<sup>2</sup>]. Taking the expectation collapses it to a polynomial in two scalars,</p>
+      <p style="text-align:center; font-family:var(--mono); font-size:0.95rem; margin: 0.4rem 0 1rem;">L(w) = 3s<sup>2</sup> + 3s<sub>&star;</sub><sup>2</sup> &minus; 4u<sup>2</sup> &minus; 2s<sub>&star;</sub>&thinsp;s,</p>
+      <p>with s = w<sup>&top;</sup>Qw (the Q-norm of w) and u = w<sup>&top;</sup>Qw<sup>&star;</sup> (the Q-aligned overlap with the signal). However large d is, the loss only sees these two numbers.</p>
+
+      <p>Here it is in d = 2.</p>
+
+      <figure class="widget" id="loss2d">
+        <div class="panel-label">L(w) for d = 2, w<sup>&star;</sup> = (1.0, 0.5)</div>
+        <svg class="loss" viewBox="0 0 440 400"></svg>
+        <div class="controls">
+          <label>a = <span class="readout">2.00</span></label>
+          <input type="range" min="0" max="6" step="0.1" value="2.0">
+        </div>
+      </figure>
+
+      <p class="caption">Two stars: the global minima at &plusmn;w<sup>&star;</sup>. The white dot at the origin is a strict local maximum. The two open circles are saddles. Sliding <em>a</em> stretches the landscape but keeps the same critical points.</p>
+    </section>
+
   </main>
 </div>
 
@@ -508,6 +531,152 @@ function makeScatterPlot(svgEl) {
   };
 }
 
+// ---------- Loss landscape (d = 2) ----------
+function makeLossPlot(svgEl) {
+  const W = 440, H = 400;
+  const M = { top: 20, right: 40, bottom: 40, left: 60 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const wMin = -1.5, wMax = 1.5;
+
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+  // foreignObject hosting a canvas for the heatmap
+  const fo = g.append('foreignObject').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih);
+  const canvas = document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
+  canvas.setAttribute('width', '240');
+  canvas.setAttribute('height', '240');
+  canvas.style.cssText = 'display:block;width:100%;height:100%';
+  fo.node().appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  const N = 240;
+
+  // Frame
+  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+
+  // Tick marks at -1, 0, 1
+  const sx = d3.scaleLinear().domain([wMin, wMax]).range([0, iw]);
+  const sy = d3.scaleLinear().domain([wMin, wMax]).range([ih, 0]);
+  [-1, 0, 1].forEach(t => {
+    g.append('line').attr('x1', sx(t)).attr('x2', sx(t)).attr('y1', ih).attr('y2', ih + 5).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', sx(t)).attr('y', ih + 17).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
+    g.append('line').attr('x1', 0).attr('x2', -5).attr('y1', sy(t)).attr('y2', sy(t)).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', -8).attr('y', sy(t) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
+  });
+
+  g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 32)
+    .attr('text-anchor', 'middle').text('w₁');
+  g.append('text').attr('class', 'axis-label')
+    .attr('transform', `translate(-32,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle').text('w₂');
+
+  // Color LUT (viridis)
+  const lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const c = d3.color(d3.interpolateViridis(i / 255));
+    lut[i * 3] = c.r; lut[i * 3 + 1] = c.g; lut[i * 3 + 2] = c.b;
+  }
+
+  const ws = [1.0, 0.5];
+  const markersG = g.append('g');
+
+  function update(aVal) {
+    const lam1Raw = Math.pow(1, -aVal), lam2Raw = Math.pow(2, -aVal);
+    const lamSum = lam1Raw + lam2Raw;
+    const lam1 = lam1Raw / lamSum, lam2 = lam2Raw / lamSum;
+    const sStar = lam1 * ws[0] * ws[0] + lam2 * ws[1] * ws[1];
+
+    // Compute L on grid; find min/max
+    const grid = new Float64Array(N * N);
+    let lmin = Infinity, lmax = -Infinity;
+    for (let j = 0; j < N; j++) {
+      const w2 = wMin + (wMax - wMin) * (1 - j / (N - 1));   // top row j=0 -> wMax
+      const lam2w2 = lam2 * w2, lam2w2sq = lam2w2 * w2, uTermY = lam2 * w2 * ws[1];
+      for (let i = 0; i < N; i++) {
+        const w1 = wMin + (wMax - wMin) * i / (N - 1);
+        const s = lam1 * w1 * w1 + lam2w2sq;
+        const u = lam1 * w1 * ws[0] + uTermY;
+        const L = 3 * s * s + 3 * sStar * sStar - 4 * u * u - 2 * sStar * s;
+        const idx = j * N + i;
+        grid[idx] = L;
+        if (L < lmin) lmin = L;
+        if (L > lmax) lmax = L;
+      }
+    }
+
+    // Render with sqrt rescaling so the wells are visible
+    const range = lmax - lmin;
+    const img = ctx.createImageData(N, N);
+    for (let k = 0; k < grid.length; k++) {
+      const t = Math.sqrt(Math.max(0, (grid[k] - lmin) / range));
+      const ti = Math.min(255, Math.max(0, Math.round(t * 255)));
+      const o = ti * 3;
+      img.data[k * 4]     = lut[o];
+      img.data[k * 4 + 1] = lut[o + 1];
+      img.data[k * 4 + 2] = lut[o + 2];
+      img.data[k * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // Markers
+    markersG.selectAll('*').remove();
+
+    // origin: white-filled dot for max
+    markersG.append('circle').attr('cx', sx(0)).attr('cy', sy(0))
+      .attr('r', 4.5).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+
+    // ±w*: stars
+    const star = d3.symbol().type(d3.symbolStar).size(110)();
+    [+1, -1].forEach(sign => {
+      const cx = sx(sign * ws[0]), cy = sy(sign * ws[1]);
+      markersG.append('path').attr('transform', `translate(${cx},${cy})`).attr('d', star)
+        .attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+      markersG.append('text').attr('x', cx + (sign > 0 ? 9 : -9)).attr('y', cy + 4)
+        .attr('text-anchor', sign > 0 ? 'start' : 'end')
+        .attr('font-family', 'var(--mono)').attr('font-size', 11).attr('fill', '#1a1a1f')
+        .text(sign > 0 ? 'w⋆' : '−w⋆');
+    });
+
+    // Saddles: solve u = 0 and s = sStar/3
+    // u = lam1 w1 ws[0] + lam2 w2 ws[1] = 0  =>  w1 = -(lam2 ws[1])/(lam1 ws[0]) * w2  (call slope m)
+    // Substitute into s = lam1 w1^2 + lam2 w2^2 = sStar/3
+    const m = -(lam2 * ws[1]) / (lam1 * ws[0]);
+    const sTarget = sStar / 3;
+    const denom = lam1 * m * m + lam2;
+    if (denom > 0 && sTarget > 0) {
+      const w2sq = sTarget / denom;
+      if (w2sq > 0) {
+        const w2 = Math.sqrt(w2sq);
+        [+1, -1].forEach(sign => {
+          const sw2 = sign * w2;
+          const sw1 = m * sw2;
+          if (sw1 >= wMin && sw1 <= wMax && sw2 >= wMin && sw2 <= wMax) {
+            markersG.append('circle').attr('cx', sx(sw1)).attr('cy', sy(sw2))
+              .attr('r', 3.5).attr('fill', 'none').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+          }
+        });
+      }
+    }
+  }
+
+  return { update };
+}
+
+function renderLoss(root) {
+  const plot = makeLossPlot(root.querySelector('svg.loss'));
+  const slider = root.querySelector('input[type="range"]');
+  const readout = root.querySelector('.readout');
+  function update(aVal) {
+    readout.textContent = aVal.toFixed(2);
+    plot.update(aVal);
+  }
+  slider.addEventListener('input', e => update(parseFloat(e.target.value)));
+  update(parseFloat(slider.value));
+}
+
 // ---------- Wire the hook section ----------
 function renderHook(root) {
   const mse = makeMSEPlot(root.querySelector('svg.mse'));
@@ -529,6 +698,7 @@ function renderHook(root) {
 }
 
 renderHook(document.getElementById('hook'));
+renderLoss(document.getElementById('loss2d'));
 </script>
 </body>
 </html>
