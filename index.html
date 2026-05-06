@@ -87,6 +87,23 @@ figure.widget {
   border-radius: 3px;
 }
 figure.widget svg { display: block; width: 100%; height: auto; }
+figure.widget .top-row {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+figure.widget .panel-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 4px 4px;
+}
 figure.widget .controls {
   display: flex;
   align-items: center;
@@ -138,15 +155,28 @@ figure.widget .controls label { white-space: nowrap; }
       <h2><span class="num">§0</span>Five training runs</h2>
       <p class="lede">Five gradient flows on the same phase retrieval loss. They differ only in the data&rsquo;s covariance spectrum: &lambda;<sub>i</sub> &prop; i<sup>&minus;a</sup>, for five values of <em>a</em>.</p>
 
+      <p>The spectrum is the variance of x along each principal axis: &lambda;<sub>1</sub> the largest, &lambda;<sub>d</sub> the smallest. A flat spectrum (a = 0) means equal variance in every direction. A steep one (large a) means most of the variance is concentrated in a few directions.</p>
+
       <figure class="widget" id="hook">
-        <svg viewBox="0 0 720 380"></svg>
+        <div class="top-row">
+          <div>
+            <div class="panel-label">spectrum &lambda;<sub>i</sub> &prop; i<sup>&minus;a</sup></div>
+            <svg class="spec" viewBox="0 0 460 200"></svg>
+          </div>
+          <div>
+            <div class="panel-label">a sample of x</div>
+            <svg class="scatter" viewBox="0 0 220 220"></svg>
+          </div>
+        </div>
+        <div class="panel-label">learning curve, MSE(t)</div>
+        <svg class="mse" viewBox="0 0 720 380"></svg>
         <div class="controls">
           <label>a = <span class="readout">1.00</span></label>
           <input type="range" min="0" max="2" step="0.05" value="1.0">
         </div>
       </figure>
 
-      <p class="caption">Slide <em>a</em>. A larger <em>a</em> gives an earlier drop and a flatter tail. The escape is faster; the convergence is slower.</p>
+      <p class="caption">Slide <em>a</em>. The spectrum steepens, the data cloud flattens, and the learning curve drops earlier but plateaus longer.</p>
     </section>
 
   </main>
@@ -252,90 +282,99 @@ function simulate({ a, d = 1000, tMax = 1e5, seed = 7 }) {
   return out;
 }
 
-// ---------- Hook plot ----------
-function renderHook(root) {
+// ---------- Shared ----------
+const REFS = [
+  { a: 0.00, color: '#1f77b4' },
+  { a: 0.50, color: '#ff7f0e' },
+  { a: 0.75, color: '#2ca02c' },
+  { a: 1.25, color: '#d62728' },
+  { a: 1.50, color: '#9467bd' }
+];
+
+function expSup(v) {
+  const e = Math.round(Math.log10(v));
+  return `10${String(e).replace(/-/g, '−').split('').map(c => '⁰¹²³⁴⁵⁶⁷⁸⁹⁻'['0123456789-'.indexOf(c)]).join('')}`;
+}
+
+// Build axis with log ticks rendered as 10^k
+function logAxis(g, scale, side, ticks, tickFormatter = expSup) {
+  const orient = side === 'bottom' ? 'bottom' : 'left';
+  const len = side === 'bottom' ? scale.range()[1] - scale.range()[0] : scale.range()[0] - scale.range()[1];
+  const ax = g.append('g').attr('class', 'axis');
+  if (side === 'bottom') ax.append('line').attr('x1', 0).attr('x2', len).attr('stroke', '#b8b1a0');
+  else ax.append('line').attr('y1', 0).attr('y2', len).attr('stroke', '#b8b1a0');
+  ticks.forEach(d => {
+    const tg = ax.append('g').attr('class', 'tick');
+    if (side === 'bottom') {
+      tg.attr('transform', `translate(${scale(d)},0)`);
+      tg.append('line').attr('y2', 5).attr('stroke', '#b8b1a0');
+      tg.append('text').attr('y', 18).attr('text-anchor', 'middle').text(tickFormatter(d));
+    } else {
+      tg.attr('transform', `translate(0,${scale(d)})`);
+      tg.append('line').attr('x2', -5).attr('stroke', '#b8b1a0');
+      tg.append('text').attr('x', -9).attr('y', 4).attr('text-anchor', 'end').text(tickFormatter(d));
+    }
+  });
+  return ax;
+}
+
+// Eigenvalues lambda_i propto i^{-a}, normalised so sum = 1.
+function spectrum(a, D = 1000) {
+  let sum = 0;
+  const lam = new Float64Array(D);
+  for (let i = 0; i < D; i++) { lam[i] = Math.pow(i + 1, -a); sum += lam[i]; }
+  for (let i = 0; i < D; i++) lam[i] /= sum;
+  return lam;
+}
+
+// ---------- MSE plot ----------
+function makeMSEPlot(svgEl) {
   const W = 720, H = 380;
   const M = { top: 16, right: 64, bottom: 44, left: 58 };
-  const iw = W - M.left - M.right;
-  const ih = H - M.top - M.bottom;
-
-  const svg = d3.select(root).select('svg');
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
   const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
   const x = d3.scaleLog().domain([1, 1e5]).range([0, iw]);
   const y = d3.scaleLog().domain([1e-4, 2]).range([ih, 0]);
-
   const xTicks = [1, 10, 100, 1e3, 1e4, 1e5];
   const yTicks = [1e-4, 1e-3, 1e-2, 1e-1, 1];
 
-  // gridlines
   const grid = g.append('g').attr('class', 'grid');
   grid.selectAll('line.gx').data(xTicks).enter().append('line')
     .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', ih);
   grid.selectAll('line.gy').data(yTicks).enter().append('line')
     .attr('x1', 0).attr('x2', iw).attr('y1', d => y(d)).attr('y2', d => y(d));
 
-  const expSup = v => {
-    const e = Math.round(Math.log10(v));
-    return `10${String(e).replace(/-/g, '−').split('').map(c => '⁰¹²³⁴⁵⁶⁷⁸⁹⁻'['0123456789-'.indexOf(c)]).join('')}`;
-  };
-
-  const xAxisG = g.append('g').attr('class', 'axis').attr('transform', `translate(0,${ih})`);
-  xAxisG.append('line').attr('x1', 0).attr('x2', iw).attr('stroke', '#b8b1a0');
-  xAxisG.selectAll('g.tick').data(xTicks).enter().append('g').attr('class', 'tick')
-    .attr('transform', d => `translate(${x(d)},0)`)
-    .each(function (d) {
-      const t = d3.select(this);
-      t.append('line').attr('y2', 5).attr('stroke', '#b8b1a0');
-      t.append('text').attr('y', 18).attr('text-anchor', 'middle').text(expSup(d));
-    });
-
-  const yAxisG = g.append('g').attr('class', 'axis');
-  yAxisG.append('line').attr('y1', 0).attr('y2', ih).attr('stroke', '#b8b1a0');
-  yAxisG.selectAll('g.tick').data(yTicks).enter().append('g').attr('class', 'tick')
-    .attr('transform', d => `translate(0,${y(d)})`)
-    .each(function (d) {
-      const t = d3.select(this);
-      t.append('line').attr('x2', -5).attr('stroke', '#b8b1a0');
-      t.append('text').attr('x', -9).attr('y', 4).attr('text-anchor', 'end').text(expSup(d));
-    });
+  logAxis(g.append('g').attr('transform', `translate(0,${ih})`), x, 'bottom', xTicks);
+  logAxis(g, y, 'left', yTicks);
 
   g.append('text').attr('class', 'axis-label')
     .attr('x', iw / 2).attr('y', ih + 36).attr('text-anchor', 'middle').text('t');
   g.append('text').attr('class', 'axis-label')
     .attr('transform', `translate(-44,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle').text('MSE');
 
-  const refs = [
-    { a: 0.00, color: '#1f77b4' },
-    { a: 0.50, color: '#ff7f0e' },
-    { a: 0.75, color: '#2ca02c' },
-    { a: 1.25, color: '#d62728' },
-    { a: 1.50, color: '#9467bd' }
-  ];
-
   const line = d3.line()
     .defined(d => d.mse > 1e-4 && d.t >= 1)
-    .x(d => x(d.t))
-    .y(d => y(d.mse))
+    .x(d => x(d.t)).y(d => y(d.mse))
     .curve(d3.curveMonotoneX);
 
   const refsG = g.append('g');
-  refs.forEach(r => {
+  REFS.forEach(r => {
     const sim = simulate({ a: r.a });
     const pts = sim.t.map((t, i) => ({ t, mse: sim.mse[i] }));
-    refsG.append('path')
-      .attr('d', line(pts))
+    refsG.append('path').attr('d', line(pts))
       .attr('stroke', r.color).attr('stroke-width', 1.4)
       .attr('fill', 'none').attr('opacity', 0.65);
   });
 
-  // Legend (upper-right; that quadrant of the plot is empty)
+  // Legend (upper-right)
   const legend = g.append('g').attr('transform', `translate(${iw - 88},6)`);
   legend.append('rect')
-    .attr('x', -8).attr('y', -4).attr('width', 92).attr('height', refs.length * 16 + 10)
+    .attr('x', -8).attr('y', -4).attr('width', 92).attr('height', REFS.length * 16 + 10)
     .attr('fill', '#fbf9f3').attr('stroke', '#d9d3c2');
-  refs.forEach((r, i) => {
+  REFS.forEach((r, i) => {
     const row = legend.append('g').attr('transform', `translate(0,${i * 16 + 8})`);
     row.append('line').attr('x1', 0).attr('x2', 18).attr('stroke', r.color).attr('stroke-width', 1.8);
     row.append('text').attr('x', 24).attr('y', 4).attr('class', 'curve-label').attr('fill', '#333')
@@ -343,18 +382,146 @@ function renderHook(root) {
   });
 
   const liveG = g.append('g');
+  return {
+    update(aVal) {
+      const sim = simulate({ a: aVal });
+      const pts = sim.t.map((t, i) => ({ t, mse: sim.mse[i] }));
+      liveG.selectAll('*').remove();
+      liveG.append('path').attr('d', line(pts))
+        .attr('stroke', '#1a1a1f').attr('stroke-width', 2.6).attr('fill', 'none');
+    }
+  };
+}
+
+// ---------- Spectrum plot ----------
+function makeSpectrumPlot(svgEl) {
+  const W = 460, H = 200;
+  const M = { top: 12, right: 24, bottom: 30, left: 52 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+  const D = 1000;
+  const x = d3.scaleLog().domain([1, D]).range([0, iw]);
+  const y = d3.scaleLog().domain([1e-6, 1]).range([ih, 0]);
+  const xTicks = [1, 10, 100, 1000];
+  const yTicks = [1e-6, 1e-4, 1e-2, 1];
+
+  const grid = g.append('g').attr('class', 'grid');
+  grid.selectAll('line.gx').data(xTicks).enter().append('line')
+    .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', ih);
+  grid.selectAll('line.gy').data(yTicks).enter().append('line')
+    .attr('x1', 0).attr('x2', iw).attr('y1', d => y(d)).attr('y2', d => y(d));
+
+  logAxis(g.append('g').attr('transform', `translate(0,${ih})`), x, 'bottom', xTicks, v => v.toString());
+  logAxis(g, y, 'left', yTicks);
+
+  g.append('text').attr('class', 'axis-label')
+    .attr('x', iw / 2).attr('y', ih + 24).attr('text-anchor', 'middle').text('coordinate i');
+
+  const line = d3.line()
+    .x(d => x(d.i)).y(d => y(Math.max(d.lam, 1e-7)))
+    .curve(d3.curveMonotoneX);
+
+  function lamPoints(a) {
+    const lam = spectrum(a, D);
+    const pts = [];
+    for (let i = 0; i < D; i++) pts.push({ i: i + 1, lam: lam[i] });
+    return pts;
+  }
+
+  const refsG = g.append('g');
+  REFS.forEach(r => {
+    refsG.append('path').attr('d', line(lamPoints(r.a)))
+      .attr('stroke', r.color).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.55);
+  });
+
+  const liveG = g.append('g');
+  return {
+    update(aVal) {
+      liveG.selectAll('*').remove();
+      liveG.append('path').attr('d', line(lamPoints(aVal)))
+        .attr('stroke', '#1a1a1f').attr('stroke-width', 2.2).attr('fill', 'none');
+    }
+  };
+}
+
+// ---------- Scatter (anisotropic data shape) ----------
+function makeScatterPlot(svgEl) {
+  const W = 220, H = 220;
+  const M = { top: 12, right: 12, bottom: 30, left: 30 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+
+  const D = 1000;
+  const COORD_X = 0;        // strongest direction
+  const COORD_Y = 49;       // 50th direction (well into the tail)
+  const N = 220;
+
+  const r = mulberry32(11);
+  const randn = () => {
+    let u = 0, v = 0;
+    while (u === 0) u = r();
+    while (v === 0) v = r();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const samples = [];
+  for (let i = 0; i < N; i++) samples.push({ sx: randn(), sy: randn() });
+
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+
+  // crosshair through origin
+  g.append('line').attr('x1', iw / 2).attr('x2', iw / 2).attr('y1', 0).attr('y2', ih)
+    .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+  g.append('line').attr('x1', 0).attr('x2', iw).attr('y1', ih / 2).attr('y2', ih / 2)
+    .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+
+  g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 22)
+    .attr('text-anchor', 'middle').text(`x along i = ${COORD_X + 1}`);
+  g.append('text').attr('class', 'axis-label')
+    .attr('transform', `translate(-18,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle')
+    .text(`x along i = ${COORD_Y + 1}`);
+
+  const dotsG = g.append('g');
+  return {
+    update(aVal) {
+      const lam = spectrum(aVal, D);
+      const sigX = Math.sqrt(lam[COORD_X]);
+      const sigY = Math.sqrt(lam[COORD_Y]);
+      // Frame the box on the larger axis so the cloud just fits horizontally for any a.
+      const range = Math.max(3.2 * sigX, 0.06);
+      const sx = d3.scaleLinear().domain([-range, range]).range([0, iw]);
+      const sy = d3.scaleLinear().domain([-range, range]).range([ih, 0]);
+      const sel = dotsG.selectAll('circle').data(samples);
+      sel.enter().append('circle')
+        .merge(sel)
+        .attr('cx', p => sx(p.sx * sigX))
+        .attr('cy', p => sy(p.sy * sigY))
+        .attr('r', 1.7).attr('fill', '#1a1a1f').attr('opacity', 0.6);
+      sel.exit().remove();
+    }
+  };
+}
+
+// ---------- Wire the hook section ----------
+function renderHook(root) {
+  const mse = makeMSEPlot(root.querySelector('svg.mse'));
+  const spec = makeSpectrumPlot(root.querySelector('svg.spec'));
+  const scatter = makeScatterPlot(root.querySelector('svg.scatter'));
+
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
 
   function update(aVal) {
     readout.textContent = aVal.toFixed(2);
-    const sim = simulate({ a: aVal });
-    const pts = sim.t.map((t, i) => ({ t, mse: sim.mse[i] }));
-    liveG.selectAll('*').remove();
-    liveG.append('path')
-      .attr('d', line(pts))
-      .attr('stroke', '#1a1a1f').attr('stroke-width', 2.6)
-      .attr('fill', 'none');
+    spec.update(aVal);
+    scatter.update(aVal);
+    mse.update(aVal);
   }
 
   slider.addEventListener('input', e => update(parseFloat(e.target.value)));
