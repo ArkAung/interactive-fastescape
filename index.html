@@ -154,6 +154,11 @@ aside.legend p { margin: 0 0 0.4rem; }
 aside.legend dl { margin: 0.4rem 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 0.9rem; }
 aside.legend dt { font-family: var(--mono); font-size: 0.82rem; color: var(--primary); padding-top: 2px; }
 aside.legend dd { margin: 0; }
+
+.intro { margin: 0 0 3.5rem; }
+.intro p { margin: 0 0 1.05rem; }
+.intro p:first-child { font-size: 1.18rem; line-height: 1.55; }
+.intro .formula { text-align: center; font-family: var(--mono); font-size: 0.95rem; margin: 0.5rem 0 1rem; color: #333; }
 </style>
 </head>
 <body>
@@ -164,6 +169,21 @@ aside.legend dd { margin: 0; }
   </header>
 
   <main id="main">
+
+    <div class="intro">
+      <p>Train a model on real data and the loss curve usually has a recognisable shape: a long flat plateau, a sharp drop, and a slow power-law tail. People have observed this for years and called it a <em>scaling law</em>. Where does the shape come from?</p>
+
+      <p>For linear models the answer is known: the <em>spectrum</em> of the training data&rsquo;s covariance (how the variance is distributed across directions in input space) sets the rate at which the loss decays. For nonlinear models the situation has been mostly empirical. This page walks through a recent paper that pins down a scaling law in the cleanest nonlinear setting available, called <strong>phase retrieval</strong>.</p>
+
+      <p>Phase retrieval is a problem with three pieces:</p>
+      <ul>
+        <li>A hidden answer: an unknown direction w<sup>&star;</sup> living in some d-dimensional space. The job of training is to recover it.</li>
+        <li>Random inputs: each input x is a random vector drawn from the training data distribution.</li>
+        <li>Squared observations: for each x you only see y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, plus a little noise. The squaring throws away the sign of w<sup>&star;</sup>, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce identical observations and the loss has two equally valid answers.</li>
+      </ul>
+
+      <p>One parameter, <em>a</em>, controls how the variance of the inputs is distributed across directions: at <em>a</em> = 0 the variance is split evenly across every direction; as <em>a</em> grows, more and more of the variance gets concentrated into a few dominant directions. The five training runs in &sect;0 differ only in <em>a</em>. The rest of the page explains why they look so different, building up the intuition step by step: the loss landscape (&sect;1), the two summary numbers that describe a trajectory (&sect;2), the three phases of training (&sect;3), the spectral tail (&sect;4), and finally the trade-off (&sect;5) that resolves &sect;0&rsquo;s puzzle.</p>
+    </div>
 
     <section id="s0">
       <h2><span class="num">&sect;0</span>Five training runs</h2>
@@ -209,10 +229,10 @@ aside.legend dd { margin: 0; }
     <section id="s1">
       <h2><span class="num">&sect;1</span>What gradient flow has to climb</h2>
 
-      <p class="lede">Training is gradient flow on a loss surface. The shape of that surface is what makes the curves in &sect;0 do what they do. Below is the surface in two dimensions. Click anywhere on the plot to drop a starting point and watch it roll downhill.</p>
+      <p class="lede">Training tries to find a guess that makes a loss as small as possible. Picture the loss as a landscape: each position (a possible guess) has a height (its loss value). Training is a ball rolling downhill on that landscape. Below is the landscape for phase retrieval in two dimensions. Click anywhere to drop a ball and watch it roll.</p>
 
       <figure class="widget" id="loss2d">
-        <div class="panel-label">click to place w(0); the dot follows gradient flow downhill</div>
+        <div class="panel-label">click to drop a starting guess; the dot rolls downhill</div>
         <svg class="loss" viewBox="0 0 440 400"></svg>
         <div class="controls">
           <label>anisotropy a = <span class="readout">2.00</span></label>
@@ -223,9 +243,9 @@ aside.legend dd { margin: 0; }
       <p>Three things to notice:</p>
 
       <ol>
-        <li><strong>There are two minima, not one.</strong> The two stars at &plusmn;w<sup>&star;</sup> are equally deep. Phase retrieval observes y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, so flipping the sign of w<sup>&star;</sup> gives identical data. The model can never distinguish them.</li>
-        <li><strong>The origin is a local maximum,</strong> not a saddle. Random initialization lands near it. To leave, gradient flow has to walk past one of the two saddles (open circles). That's the plateau in &sect;0's curves.</li>
-        <li><strong>Sliding <em>a</em> stretches the landscape</strong> along the dominant eigenvector of Q, but all five critical points stay where they are. Anisotropy reshapes the path; it doesn't change the destination.</li>
+        <li><strong>Two valleys, not one.</strong> The two stars are equally deep, at exactly opposite directions. Phase retrieval&rsquo;s observation squares an inner product, which throws away the sign. So the answer and its sign-flipped version produce identical data; both valleys are correct.</li>
+        <li><strong>The origin is a hill, not a valley.</strong> Random starting guesses land near the origin. To roll into a valley the ball has to skirt past one of the two saddles (open circles). That detour is where the plateau in &sect;0&rsquo;s curves comes from.</li>
+        <li><strong>Sliding <em>a</em> stretches the landscape</strong> along one direction (the high-variance direction of the data). The two valleys, the hill, and the two saddles stay where they are; only the slopes between them change.</li>
       </ol>
     </section>
 
