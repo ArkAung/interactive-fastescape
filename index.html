@@ -224,7 +224,7 @@ aside.legend dd { margin: 0; }
     <section id="s1">
       <h2><span class="num">&sect;1</span>What gradient flow has to climb</h2>
 
-      <p class="lede">Training tries to find a guess that makes a loss as small as possible. Picture the loss as a landscape: each position (a possible guess) has a height (its loss value). Training is a ball rolling downhill on that landscape. Below is the landscape for phase retrieval in two dimensions. Click anywhere to drop a ball and watch it roll.</p>
+      <p class="lede">Training is just an optimization problem. There&rsquo;s a loss function L(w), and you want a setting of w that makes it as small as you can get it. The way to picture this is to imagine the loss as a hilly landscape: every possible w is a position on the ground, and the height there is the loss value. Training rolls a ball downhill until it stops at a minimum. We can&rsquo;t draw the landscape for 1000-dimensional phase retrieval, but we can draw it in 2D. Click anywhere on the picture below to drop a ball and watch where it ends up.</p>
 
       <figure class="widget" id="loss2d">
         <div class="panel-label">click to drop a starting guess; the dot rolls downhill</div>
@@ -235,12 +235,12 @@ aside.legend dd { margin: 0; }
         </div>
       </figure>
 
-      <p>Three things to notice:</p>
+      <p>A few things are worth pointing out about this picture:</p>
 
       <ol>
-        <li><strong>Two valleys, not one.</strong> The two stars are equally deep, at exactly opposite directions. Phase retrieval&rsquo;s observation squares an inner product, which throws away the sign. So the answer and its sign-flipped version produce identical data; both valleys are correct.</li>
-        <li><strong>The origin is a hill, not a valley.</strong> Random starting guesses land near the origin. To roll into a valley the ball has to skirt past one of the two saddles (open circles). That detour is where the plateau in &sect;0&rsquo;s curves comes from.</li>
-        <li><strong>Sliding <em>a</em> stretches the landscape</strong> along one direction (the high-variance direction of the data). The two valleys, the hill, and the two saddles stay where they are; only the slopes between them change.</li>
+        <li><strong>There are two valleys, not one.</strong> Both stars are equally deep, and they sit at exactly opposite directions. Phase retrieval squares an inner product, which throws away the sign of the answer, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce literally the same data. The loss has no way to tell them apart, so both valleys are equally good answers.</li>
+        <li><strong>The origin is a hill, not a valley.</strong> A random starting guess lands somewhere near the origin (small in every coordinate). To get into one of the valleys, the ball has to skirt past one of the two saddles (the open circles sitting between the origin and the stars). That awkward detour is where the long plateau in &sect;0&rsquo;s curves comes from.</li>
+        <li><strong>Sliding <em>a</em> stretches the landscape</strong> along one direction, namely the high-variance direction of the data. The two valleys, the hill, and the two saddles all stay exactly where they are; what changes are the slopes between them. So anisotropy reshapes the path the ball takes, but it doesn&rsquo;t change which valleys exist.</li>
       </ol>
     </section>
 
