@@ -226,6 +226,33 @@ figure.widget .controls label { white-space: nowrap; }
       <p>The five faded curves are the same five trajectories whose MSE you saw in &sect;0. The black curve is your slider&rsquo;s <em>a</em>. Each one starts near the origin (random init has u &asymp; 0, s &asymp; 0) and ends at the signal (u = s = 1).</p>
 
       <p>The open circle at (0, 1/3) is the saddle from &sect;1, now in (u, s) coordinates. Random init places you near the s-axis, and the trajectory has to pass close to that saddle before u can grow toward 1. That bend is the plateau in &sect;0&rsquo;s curves.</p>
+
+      <p>What you can&rsquo;t see in this picture is <em>how fast</em> the dot is moving. That&rsquo;s the next section.</p>
+    </section>
+
+    <section id="s3">
+      <h2><span class="num">&sect;3</span>Three phases of training</h2>
+
+      <p class="lede">Plot u, s, and MSE as functions of time and three distinct phases pop out, with two flat shoulders and a sharp transition between them.</p>
+
+      <figure class="widget" id="time-series">
+        <div class="panel-label">u(t) and s(t), linear</div>
+        <svg class="us-time" viewBox="0 0 720 240"></svg>
+        <div class="panel-label" style="margin-top: 10px;">MSE(t), log-log</div>
+        <svg class="mse-time" viewBox="0 0 720 260"></svg>
+        <div class="controls">
+          <label>a = <span class="readout">1.00</span></label>
+          <input type="range" min="0" max="2" step="0.05" value="1.0">
+        </div>
+      </figure>
+
+      <ol>
+        <li><strong>Phase I: escape from the saddle.</strong> u(t) crawls upward from u(0) &asymp; 1/&radic;d. The trajectory in &sect;2 was lingering near (0, 1/3); on this plot u looks flat and s nudges up to about 1/3.</li>
+        <li><strong>Phase II: convergence of (u, s).</strong> Once u escapes, both summary statistics sprint toward 1. The MSE drops fast.</li>
+        <li><strong>Phase III: the spectral tail.</strong> u and s pin at 1 (the dot in &sect;2 sits on top of the signal). But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude. Something is still happening that (u, s) is missing.</li>
+      </ol>
+
+      <p>That last point is what the next section is about.</p>
     </section>
 
   </main>
@@ -555,6 +582,163 @@ function makeScatterPlot(svgEl) {
       sel.exit().remove();
     }
   };
+}
+
+// ---------- u/s/MSE time-series ----------
+function makeTimeSeriesPlot(usSvg, mseSvg) {
+  const xDomain = [1, 1e5];
+  const xTicks = [1, 10, 100, 1e3, 1e4, 1e5];
+
+  // ===== top panel: u(t), s(t) on linear y =====
+  const W1 = 720, H1 = 240;
+  const M1 = { top: 16, right: 80, bottom: 36, left: 60 };
+  const iw1 = W1 - M1.left - M1.right, ih1 = H1 - M1.top - M1.bottom;
+  d3.select(usSvg).selectAll('*').remove();
+  const g1 = d3.select(usSvg).append('g').attr('transform', `translate(${M1.left},${M1.top})`);
+  const x1 = d3.scaleLog().domain(xDomain).range([0, iw1]);
+  const y1 = d3.scaleLinear().domain([0, 1.15]).range([ih1, 0]);
+
+  // gridlines
+  g1.append('g').attr('class', 'grid').selectAll('line.gx').data(xTicks).enter().append('line')
+    .attr('x1', d => x1(d)).attr('x2', d => x1(d)).attr('y1', 0).attr('y2', ih1);
+  g1.append('g').attr('class', 'grid').selectAll('line.gy').data([0.25, 0.5, 0.75, 1.0]).enter().append('line')
+    .attr('x1', 0).attr('x2', iw1).attr('y1', d => y1(d)).attr('y2', d => y1(d));
+
+  // frame + ticks
+  g1.append('rect').attr('x', 0).attr('y', 0).attr('width', iw1).attr('height', ih1)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  xTicks.forEach(t => {
+    g1.append('line').attr('x1', x1(t)).attr('x2', x1(t)).attr('y1', ih1).attr('y2', ih1 + 4).attr('stroke', '#b8b1a0');
+    g1.append('text').attr('x', x1(t)).attr('y', ih1 + 16).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(t));
+  });
+  [0, 0.5, 1.0].forEach(v => {
+    g1.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y1(v)).attr('y2', y1(v)).attr('stroke', '#b8b1a0');
+    g1.append('text').attr('x', -8).attr('y', y1(v) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(v);
+  });
+  g1.append('text').attr('class', 'axis-label').attr('x', iw1 / 2).attr('y', ih1 + 30)
+    .attr('text-anchor', 'middle').text('t');
+
+  // legend on right
+  const leg = g1.append('g').attr('transform', `translate(${iw1 + 10}, 12)`);
+  leg.append('line').attr('x1', 0).attr('x2', 18).attr('stroke', '#4c2db3').attr('stroke-width', 2.4);
+  leg.append('text').attr('x', 24).attr('y', 4).attr('class', 'curve-label').attr('fill', '#4c2db3').text('u(t)');
+  leg.append('line').attr('x1', 0).attr('x2', 18).attr('y1', 18).attr('y2', 18).attr('stroke', '#c8632b').attr('stroke-width', 2.4);
+  leg.append('text').attr('x', 24).attr('y', 22).attr('class', 'curve-label').attr('fill', '#c8632b').text('s(t)');
+
+  const liveG1 = g1.append('g');
+
+  // ===== bottom panel: MSE(t) log-log =====
+  const W2 = 720, H2 = 260;
+  const M2 = { top: 16, right: 80, bottom: 36, left: 60 };
+  const iw2 = W2 - M2.left - M2.right, ih2 = H2 - M2.top - M2.bottom;
+  d3.select(mseSvg).selectAll('*').remove();
+  const g2 = d3.select(mseSvg).append('g').attr('transform', `translate(${M2.left},${M2.top})`);
+  const x2 = d3.scaleLog().domain(xDomain).range([0, iw2]);
+  const y2 = d3.scaleLog().domain([1e-4, 2]).range([ih2, 0]);
+  const yTicks2 = [1e-4, 1e-3, 1e-2, 1e-1, 1];
+
+  g2.append('g').attr('class', 'grid').selectAll('line.gx').data(xTicks).enter().append('line')
+    .attr('x1', d => x2(d)).attr('x2', d => x2(d)).attr('y1', 0).attr('y2', ih2);
+  g2.append('g').attr('class', 'grid').selectAll('line.gy').data(yTicks2).enter().append('line')
+    .attr('x1', 0).attr('x2', iw2).attr('y1', d => y2(d)).attr('y2', d => y2(d));
+  g2.append('rect').attr('x', 0).attr('y', 0).attr('width', iw2).attr('height', ih2)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  xTicks.forEach(t => {
+    g2.append('line').attr('x1', x2(t)).attr('x2', x2(t)).attr('y1', ih2).attr('y2', ih2 + 4).attr('stroke', '#b8b1a0');
+    g2.append('text').attr('x', x2(t)).attr('y', ih2 + 16).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(t));
+  });
+  yTicks2.forEach(v => {
+    g2.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y2(v)).attr('y2', y2(v)).attr('stroke', '#b8b1a0');
+    g2.append('text').attr('x', -8).attr('y', y2(v) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(v));
+  });
+  g2.append('text').attr('class', 'axis-label').attr('x', iw2 / 2).attr('y', ih2 + 30)
+    .attr('text-anchor', 'middle').text('t');
+  g2.append('text').attr('class', 'axis-label')
+    .attr('transform', `translate(-44,${ih2 / 2}) rotate(-90)`).attr('text-anchor', 'middle').text('MSE');
+
+  // line generators
+  const uLineGen = d3.line().defined(d => d.t >= 1).x(d => x1(d.t)).y(d => y1(d.u)).curve(d3.curveMonotoneX);
+  const sLineGen = d3.line().defined(d => d.t >= 1).x(d => x1(d.t)).y(d => y1(d.s)).curve(d3.curveMonotoneX);
+  const mseLineGen = d3.line().defined(d => d.mse > 1e-4 && d.t >= 1).x(d => x2(d.t)).y(d => y2(d.mse)).curve(d3.curveMonotoneX);
+
+  // Reference MSE curves (mirror §0's hook plot for context)
+  const refsG2 = g2.append('g');
+  REFS.forEach(r => {
+    const sim = simulate({ a: r.a });
+    const pts = sim.t.map((t, i) => ({ t, mse: sim.mse[i] }));
+    refsG2.append('path').attr('d', mseLineGen(pts))
+      .attr('stroke', r.color).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.45);
+  });
+
+  const liveG2 = g2.append('g');
+  const phaseLinesG = g1.append('g');
+  const phaseLinesG2 = g2.append('g');
+
+  function findCrossing(arr, ts, threshold) {
+    for (let i = 0; i < arr.length; i++) if (arr[i] > threshold) return ts[i];
+    return null;
+  }
+
+  function update(aVal) {
+    liveG1.selectAll('*').remove();
+    liveG2.selectAll('*').remove();
+    phaseLinesG.selectAll('*').remove();
+    phaseLinesG2.selectAll('*').remove();
+
+    const sim = simulate({ a: aVal });
+    const pts = sim.t.map((t, i) => ({ t, u: sim.u[i], s: sim.s[i], mse: sim.mse[i] }));
+
+    // Phase boundaries: T1 = first t with u > 0.5; T2 = first t with min(u,s) > 0.99
+    const T1 = findCrossing(sim.u, sim.t, 0.5);
+    const T2 = (() => {
+      for (let i = 0; i < sim.t.length; i++) if (sim.u[i] > 0.99 && sim.s[i] > 0.99) return sim.t[i];
+      return null;
+    })();
+
+    // u(t), s(t)
+    liveG1.append('path').attr('d', uLineGen(pts))
+      .attr('stroke', '#4c2db3').attr('stroke-width', 2.4).attr('fill', 'none');
+    liveG1.append('path').attr('d', sLineGen(pts))
+      .attr('stroke', '#c8632b').attr('stroke-width', 2.4).attr('fill', 'none');
+
+    // MSE
+    liveG2.append('path').attr('d', mseLineGen(pts))
+      .attr('stroke', '#1a1a1f').attr('stroke-width', 2.4).attr('fill', 'none');
+
+    // Phase boundary dashed lines and labels
+    function drawBoundary(g, x, ih, T, label) {
+      if (!T || T < 1 || T > 1e5) return;
+      g.append('line').attr('x1', x(T)).attr('x2', x(T)).attr('y1', 0).attr('y2', ih)
+        .attr('stroke', '#1a1a1f').attr('stroke-dasharray', '2 3').attr('stroke-width', 1).attr('opacity', 0.55);
+      g.append('text').attr('x', x(T) + 4).attr('y', 12).attr('font-family', 'var(--mono)')
+        .attr('font-size', 10).attr('fill', '#1a1a1f').text(label);
+    }
+    drawBoundary(phaseLinesG, x1, ih1, T1, 'T₁');
+    drawBoundary(phaseLinesG, x1, ih1, T2, 'T₂');
+    drawBoundary(phaseLinesG2, x2, ih2, T1, '');
+    drawBoundary(phaseLinesG2, x2, ih2, T2, '');
+  }
+
+  return { update };
+}
+
+function renderTimeSeries(root) {
+  const plot = makeTimeSeriesPlot(
+    root.querySelector('svg.us-time'),
+    root.querySelector('svg.mse-time')
+  );
+  const slider = root.querySelector('input[type="range"]');
+  const readout = root.querySelector('.readout');
+  function update(aVal) {
+    readout.textContent = aVal.toFixed(2);
+    plot.update(aVal);
+  }
+  slider.addEventListener('input', e => update(parseFloat(e.target.value)));
+  update(parseFloat(slider.value));
 }
 
 // ---------- (u, s) phase trajectory plot ----------
@@ -912,6 +1096,7 @@ function renderHook(root) {
 renderHook(document.getElementById('hook'));
 renderLoss(document.getElementById('loss2d'));
 renderUS(document.getElementById('us-traj'));
+renderTimeSeries(document.getElementById('time-series'));
 </script>
 </body>
 </html>
