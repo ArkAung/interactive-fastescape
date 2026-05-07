@@ -180,37 +180,26 @@ figure.widget .controls label { white-space: nowrap; }
     </section>
 
     <section id="s1">
-      <h2><span class="num">&sect;1</span>The loss</h2>
+      <h2><span class="num">&sect;1</span>What gradient flow has to climb</h2>
 
-      <p class="lede">Each observation is y = &lang;x, w<sup>&star;</sup>&rang;<sup>2</sup> + &xi;. Squaring the inner product throws away the sign of w<sup>&star;</sup>, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce identical data. The loss inherits that symmetry: it has two equally good minima.</p>
-
-      <p>To see this concretely, walk along the line w = &alpha;w<sup>&star;</sup> and watch the loss. It works out to</p>
-      <p style="text-align:center; font-family:var(--mono); font-size:0.95rem; margin: 0.4rem 0 1rem;">L(&alpha;w<sup>&star;</sup>) = 3&thinsp;s<sub>&star;</sub><sup>2</sup>&thinsp;(&alpha;<sup>2</sup> &minus; 1)<sup>2</sup>,</p>
-      <p>a quartic in &alpha; with zeros at &alpha; = +1 and &alpha; = &minus;1.</p>
-
-      <figure class="widget" id="loss1d">
-        <div class="panel-label">L along the signal direction</div>
-        <svg class="loss1d" viewBox="0 0 460 240"></svg>
-        <div class="controls">
-          <label>&alpha; = <span class="readout">0.00</span></label>
-          <input type="range" min="-1.5" max="1.5" step="0.01" value="0">
-        </div>
-      </figure>
-
-      <p class="caption">Two equal-depth wells at &alpha; = &plusmn;1. A bump at &alpha; = 0, which is where random initialization tends to start. The dashed line confirms that +&alpha; and &minus;&alpha; always have the same loss.</p>
-
-      <p>That's a 1D slice. In two dimensions you get the same wells plus extra structure: <em>saddles</em> sitting between the two minima.</p>
+      <p class="lede">Training is gradient flow on a loss surface. The shape of that surface is what makes the curves in &sect;0 do what they do. Below is the surface in two dimensions. Click anywhere on the plot to drop a starting point and watch it roll downhill.</p>
 
       <figure class="widget" id="loss2d">
-        <div class="panel-label">L(w) for d = 2, w<sup>&star;</sup> = (1.0, 0.5)</div>
+        <div class="panel-label">click to place w(0); the dot follows gradient flow downhill</div>
         <svg class="loss" viewBox="0 0 440 400"></svg>
         <div class="controls">
-          <label>a = <span class="readout">2.00</span></label>
+          <label>anisotropy a = <span class="readout">2.00</span></label>
           <input type="range" min="0" max="6" step="0.1" value="2.0">
         </div>
       </figure>
 
-      <p class="caption">Stars: the two global minima at &plusmn;w<sup>&star;</sup>. White dot: the strict local maximum at the origin. Open circles: the two saddles. Sliding <em>a</em> stretches Q (the data covariance), which warps the landscape but leaves all five critical points intact. To go from the origin to either minimum, gradient flow has to navigate around a saddle, and that's where the long plateau in §0 comes from.</p>
+      <p>Three things to notice:</p>
+
+      <ol>
+        <li><strong>There are two minima, not one.</strong> The two stars at &plusmn;w<sup>&star;</sup> are equally deep. Phase retrieval observes y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, so flipping the sign of w<sup>&star;</sup> gives identical data. The model can never distinguish them.</li>
+        <li><strong>The origin is a local maximum,</strong> not a saddle. Random initialization lands near it. To leave, gradient flow has to walk past one of the two saddles (open circles). That's the plateau in &sect;0's curves.</li>
+        <li><strong>Sliding <em>a</em> stretches the landscape</strong> along the dominant eigenvector of Q, but all five critical points stay where they are. Anisotropy reshapes the path; it doesn't change the destination.</li>
+      </ol>
     </section>
 
   </main>
@@ -542,111 +531,6 @@ function makeScatterPlot(svgEl) {
   };
 }
 
-// ---------- Loss along the signal direction (1D slice) ----------
-function makeLoss1DPlot(svgEl) {
-  const W = 460, H = 240;
-  const M = { top: 16, right: 24, bottom: 40, left: 56 };
-  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
-  const aMin = -1.5, aMax = 1.5;
-  const sStar = 1;
-  const Lmax = 3 * sStar * sStar * Math.pow(aMax * aMax - 1, 2);
-
-  const x = d3.scaleLinear().domain([aMin, aMax]).range([0, iw]);
-  const y = d3.scaleLinear().domain([0, Math.max(Lmax, 4)]).range([ih, 0]);
-
-  const svg = d3.select(svgEl);
-  svg.selectAll('*').remove();
-  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
-
-  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
-    .attr('fill', 'none').attr('stroke', '#b8b1a0');
-
-  // x ticks
-  [-1, 0, 1].forEach(t => {
-    g.append('line').attr('x1', x(t)).attr('x2', x(t)).attr('y1', ih).attr('y2', ih + 4).attr('stroke', '#b8b1a0');
-    g.append('text').attr('x', x(t)).attr('y', ih + 16).attr('text-anchor', 'middle')
-      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
-  });
-  // y ticks
-  [0, 1, 2, 3, 4].forEach(t => {
-    if (t > Math.max(Lmax, 4) + 0.01) return;
-    g.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y(t)).attr('y2', y(t)).attr('stroke', '#b8b1a0');
-    g.append('text').attr('x', -8).attr('y', y(t) + 3).attr('text-anchor', 'end')
-      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
-  });
-
-  g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 32)
-    .attr('text-anchor', 'middle').text('α');
-  g.append('text').attr('class', 'axis-label')
-    .attr('transform', `translate(-40,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle')
-    .text('L(αw⋆)');
-
-  // Curve L(α) = 3 s*² (α² - 1)²
-  const pts = [];
-  for (let i = 0; i <= 240; i++) {
-    const a = aMin + (aMax - aMin) * i / 240;
-    pts.push({ a, L: 3 * sStar * sStar * Math.pow(a * a - 1, 2) });
-  }
-  const lineGen = d3.line().x(d => x(d.a)).y(d => y(d.L)).curve(d3.curveMonotoneX);
-  g.append('path').attr('d', lineGen(pts))
-    .attr('stroke', '#4c2db3').attr('stroke-width', 2.2).attr('fill', 'none');
-
-  // Annotated zeros at α=±1
-  [-1, 1].forEach(a => {
-    g.append('circle').attr('cx', x(a)).attr('cy', y(0))
-      .attr('r', 3).attr('fill', '#4c2db3');
-    g.append('text').attr('x', x(a)).attr('y', y(0) + 18)
-      .attr('text-anchor', 'middle').attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#4c2db3')
-      .text(`α = ${a}`);
-  });
-
-  const liveG = g.append('g');
-
-  function update(aVal) {
-    liveG.selectAll('*').remove();
-    const Lval = 3 * sStar * sStar * Math.pow(aVal * aVal - 1, 2);
-
-    // Connector showing equal loss at +α and -α
-    if (Math.abs(aVal) > 0.02) {
-      liveG.append('line').attr('x1', x(-aVal)).attr('x2', x(aVal))
-        .attr('y1', y(Lval)).attr('y2', y(Lval))
-        .attr('stroke', '#1a1a1f').attr('stroke-dasharray', '3 4').attr('stroke-width', 1);
-    }
-
-    // Two markers at +α and -α (same loss)
-    [+1, -1].forEach(sign => {
-      const ap = sign * aVal;
-      liveG.append('circle').attr('cx', x(ap)).attr('cy', y(Lval))
-        .attr('r', 5).attr('fill', '#1a1a1f').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    });
-
-    // L readout floating near the right marker
-    if (Math.abs(aVal) > 0.05) {
-      liveG.append('text').attr('x', x(Math.abs(aVal)) + 9).attr('y', y(Lval) - 6)
-        .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#1a1a1f')
-        .text(`L = ${Lval.toFixed(2)}`);
-    } else {
-      liveG.append('text').attr('x', x(0) + 9).attr('y', y(Lval) - 6)
-        .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#1a1a1f')
-        .text(`L = ${Lval.toFixed(2)}`);
-    }
-  }
-
-  return { update };
-}
-
-function renderLoss1D(root) {
-  const plot = makeLoss1DPlot(root.querySelector('svg.loss1d'));
-  const slider = root.querySelector('input[type="range"]');
-  const readout = root.querySelector('.readout');
-  function update(aVal) {
-    readout.textContent = aVal.toFixed(2);
-    plot.update(aVal);
-  }
-  slider.addEventListener('input', e => update(parseFloat(e.target.value)));
-  update(parseFloat(slider.value));
-}
-
 // ---------- Loss landscape (d = 2) ----------
 function makeLossPlot(svgEl) {
   const W = 440, H = 400;
@@ -697,13 +581,86 @@ function makeLossPlot(svgEl) {
   }
 
   const ws = [1.0, 0.5];
+  const trajG = g.append('g');
   const markersG = g.append('g');
+  let state = { lam1: 0.5, lam2: 0.5, sStar: 1, animFrame: null };
+
+  // Trajectory simulator (gradient flow in d=2, simple Euler)
+  function trajectory(w0) {
+    const path = [w0.slice()];
+    let w = w0.slice();
+    const dt = 0.04;
+    let prevDist = Infinity;
+    for (let k = 0; k < 4000; k++) {
+      const s = state.lam1 * w[0] * w[0] + state.lam2 * w[1] * w[1];
+      const u = state.lam1 * w[0] * ws[0] + state.lam2 * w[1] * ws[1];
+      const fac = 4 * (state.sStar - 3 * s);
+      const dw0 = state.lam1 * (fac * w[0] + 8 * u * ws[0]);
+      const dw1 = state.lam2 * (fac * w[1] + 8 * u * ws[1]);
+      w[0] += dw0 * dt;
+      w[1] += dw1 * dt;
+      // Clamp to prevent runaway from ill-conditioned starts (e.g. clicked exactly at origin)
+      if (Math.abs(w[0]) > 5 || Math.abs(w[1]) > 5) break;
+      if (k % 8 === 0) path.push(w.slice());
+      const dPlus  = (w[0] - ws[0]) ** 2 + (w[1] - ws[1]) ** 2;
+      const dMinus = (w[0] + ws[0]) ** 2 + (w[1] + ws[1]) ** 2;
+      const dist = Math.min(dPlus, dMinus);
+      if (dist < 1e-4) break;
+      prevDist = dist;
+    }
+    path.push(w.slice());
+    return path;
+  }
+
+  function animateTrajectory(path) {
+    if (state.animFrame) cancelAnimationFrame(state.animFrame);
+    trajG.selectAll('*').remove();
+    const lineGen = d3.line().x(d => sx(d[0])).y(d => sy(d[1])).curve(d3.curveCatmullRom.alpha(0.5));
+    const pathEl = trajG.append('path').attr('fill', 'none')
+      .attr('stroke', '#fff').attr('stroke-width', 2.4)
+      .attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
+      .attr('opacity', 0.95);
+    const startDot = trajG.append('circle').attr('cx', sx(path[0][0])).attr('cy', sy(path[0][1]))
+      .attr('r', 4).attr('fill', '#1a1a1f').attr('stroke', '#fff').attr('stroke-width', 1.5);
+    const dot = trajG.append('circle').attr('r', 5).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+    let i = 0;
+    const stepPerFrame = Math.max(1, Math.ceil(path.length / 120));
+    function step() {
+      i = Math.min(i + stepPerFrame, path.length - 1);
+      pathEl.attr('d', lineGen(path.slice(0, i + 1)));
+      dot.attr('cx', sx(path[i][0])).attr('cy', sy(path[i][1]));
+      if (i < path.length - 1) state.animFrame = requestAnimationFrame(step);
+      else state.animFrame = null;
+    }
+    step();
+  }
+
+  // Click-capture rect (transparent, on top so foreignObject doesn't swallow clicks)
+  const clickRect = g.append('rect')
+    .attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'transparent').style('cursor', 'crosshair');
+  // First-time hint, fades out on first click
+  const hint = g.append('text').attr('x', iw / 2).attr('y', 22)
+    .attr('text-anchor', 'middle').attr('font-family', 'var(--mono)').attr('font-size', 11)
+    .attr('fill', '#fff').attr('pointer-events', 'none')
+    .text('click anywhere');
+
+  clickRect.on('click', function (event) {
+    const [px, py] = d3.pointer(event, this);
+    const w0 = [sx.invert(px), sy.invert(py)];
+    if (Math.hypot(w0[0], w0[1]) < 1e-3) w0[0] = 1e-3;
+    animateTrajectory(trajectory(w0));
+    hint.transition().duration(200).attr('opacity', 0);
+  });
 
   function update(aVal) {
     const lam1Raw = Math.pow(1, -aVal), lam2Raw = Math.pow(2, -aVal);
     const lamSum = lam1Raw + lam2Raw;
     const lam1 = lam1Raw / lamSum, lam2 = lam2Raw / lamSum;
     const sStar = lam1 * ws[0] * ws[0] + lam2 * ws[1] * ws[1];
+    state.lam1 = lam1; state.lam2 = lam2; state.sStar = sStar;
+    if (state.animFrame) { cancelAnimationFrame(state.animFrame); state.animFrame = null; }
+    trajG.selectAll('*').remove();
 
     // Compute L on grid; find min/max
     const grid = new Float64Array(N * N);
@@ -814,7 +771,6 @@ function renderHook(root) {
 }
 
 renderHook(document.getElementById('hook'));
-renderLoss1D(document.getElementById('loss1d'));
 renderLoss(document.getElementById('loss2d'));
 </script>
 </body>
