@@ -255,6 +255,31 @@ figure.widget .controls label { white-space: nowrap; }
       <p>That last point is what the next section is about.</p>
     </section>
 
+    <section id="s4">
+      <h2><span class="num">&sect;4</span>The spectral tail</h2>
+
+      <p class="lede">After (u, s) reach 1, the model has the right size and the right alignment <em>on average</em>. But coordinate by coordinate, work remains. Plot the squared error of every coordinate at five snapshots in time:</p>
+
+      <figure class="widget" id="tail">
+        <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times</div>
+        <svg class="tail" viewBox="0 0 720 380"></svg>
+        <div class="controls">
+          <label>a = <span class="readout">1.00</span></label>
+          <input type="range" min="0" max="2" step="0.05" value="1.0">
+        </div>
+      </figure>
+
+      <ol>
+        <li>The leftmost coordinates (largest eigenvalues, biggest variance) drop to near zero error first. Gradient flow learns those at rate &asymp; &lambda;<sub>1</sub>, which is large.</li>
+        <li>The rightmost coordinates (smallest eigenvalues, tiny variance) decay at rate &asymp; &lambda;<sub>d</sub>, which is tiny. They stay above zero for orders of magnitude longer.</li>
+        <li>For larger <em>a</em>, the gap between &lambda;<sub>1</sub> and &lambda;<sub>d</sub> grows. So head learns faster, tail learns slower. Two effects, one parameter.</li>
+      </ol>
+
+      <p>The MSE you saw in &sect;0 is just the average of these per-coordinate errors. The plateau in MSE during Phase III is the tail being slowly chipped away.</p>
+
+      <p>Now we have half of &sect;0's puzzle: <em>why slow tail</em>. The other half is <em>why fast escape</em>. That's next.</p>
+    </section>
+
   </main>
 </div>
 
@@ -287,7 +312,7 @@ function makeRandn(seed) {
 // In coordinates: dw_i/dt = lambda_i [ 4 (s* - 3 s) w_i + 8 u w*_i ],
 // with s = sum lam_i w_i^2, u = sum lam_i w_i w*_i, s* = sum lam_i w*_i^2 = 1.
 // Trapezoidal exponential integrator: predictor with frozen (s, u), corrector at midpoint.
-function simulate({ a, d = 1000, tMax = 1e5, seed = 7 }) {
+function simulate({ a, d = 1000, tMax = 1e5, seed = 7, withSnapshots = false }) {
   const randn = makeRandn(seed);
 
   const lam = new Float64Array(d);
@@ -327,6 +352,7 @@ function simulate({ a, d = 1000, tMax = 1e5, seed = 7 }) {
   }
 
   const out = { t: [], mse: [], u: [], s: [] };
+  if (withSnapshots) { out.snap = []; out.ws = ws; out.lam = lam; }
   function record(t) {
     let s = 0, u = 0, mp = 0, mn = 0;
     for (let i = 0; i < d; i++) {
@@ -339,6 +365,7 @@ function simulate({ a, d = 1000, tMax = 1e5, seed = 7 }) {
     out.mse.push(Math.min(mp, mn) / d);
     out.u.push(Math.abs(u));
     out.s.push(s);
+    if (withSnapshots) out.snap.push(new Float64Array(w));
   }
 
   record(1);
@@ -582,6 +609,124 @@ function makeScatterPlot(svgEl) {
       sel.exit().remove();
     }
   };
+}
+
+// ---------- Per-coordinate error (spectral tail) ----------
+function makeTailPlot(svgEl) {
+  const W = 720, H = 380;
+  const M = { top: 16, right: 110, bottom: 40, left: 60 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+  const D = 1000;
+  const x = d3.scaleLog().domain([1, D]).range([0, iw]);
+  const y = d3.scaleLog().domain([1e-6, 4]).range([ih, 0]);
+  const xTicks = [1, 10, 100, 1000];
+  const yTicks = [1e-6, 1e-4, 1e-2, 1];
+
+  // grid + frame + ticks
+  g.append('g').attr('class', 'grid').selectAll('line.gx').data(xTicks).enter().append('line')
+    .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', ih);
+  g.append('g').attr('class', 'grid').selectAll('line.gy').data(yTicks).enter().append('line')
+    .attr('x1', 0).attr('x2', iw).attr('y1', d => y(d)).attr('y2', d => y(d));
+  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  xTicks.forEach(t => {
+    g.append('line').attr('x1', x(t)).attr('x2', x(t)).attr('y1', ih).attr('y2', ih + 4).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', x(t)).attr('y', ih + 16).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
+  });
+  yTicks.forEach(v => {
+    g.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', -8).attr('y', y(v) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(v));
+  });
+  g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 30)
+    .attr('text-anchor', 'middle').text('coordinate i');
+  g.append('text').attr('class', 'axis-label')
+    .attr('transform', `translate(-44,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle')
+    .text('squared error');
+
+  const snapTimes = [10, 100, 1000, 10000, 100000];
+  const snapColors = ['#dac8a3', '#c89c5c', '#a86a30', '#7d3f1c', '#3d1c0c'];
+
+  // legend
+  const legend = g.append('g').attr('transform', `translate(${iw + 12}, 10)`);
+  legend.append('text').attr('x', 0).attr('y', 0).attr('class', 'curve-label').attr('fill', '#1a1a1f').text('time');
+  snapTimes.forEach((t, i) => {
+    const ry = 10 + i * 14;
+    legend.append('line').attr('x1', 0).attr('x2', 18).attr('y1', ry).attr('y2', ry)
+      .attr('stroke', snapColors[i]).attr('stroke-width', 2.2);
+    legend.append('text').attr('x', 24).attr('y', ry + 4).attr('class', 'curve-label')
+      .attr('fill', '#333').text(`t = ${expSup(t)}`);
+  });
+
+  const liveG = g.append('g');
+  const lineGen = d3.line()
+    .x(d => x(d.i)).y(d => y(Math.max(d.e, 1e-7)))
+    .defined(d => d.e > 1e-7)
+    .curve(d3.curveMonotoneX);
+
+  function update(aVal) {
+    liveG.selectAll('*').remove();
+    const sim = simulate({ a: aVal, withSnapshots: true });
+
+    // Choose global sign by comparing final w to ±w*
+    const last = sim.snap[sim.snap.length - 1];
+    let mp = 0, mn = 0;
+    for (let i = 0; i < D; i++) {
+      const dp = last[i] - sim.ws[i], dn = last[i] + sim.ws[i];
+      mp += dp * dp; mn += dn * dn;
+    }
+    const sign = mp <= mn ? 1 : -1;
+
+    snapTimes.forEach((tk, k) => {
+      // closest snap by log-time distance
+      let bestIdx = 0, bestDiff = Infinity;
+      for (let i = 0; i < sim.t.length; i++) {
+        const d = Math.abs(Math.log10(Math.max(sim.t[i], 1)) - Math.log10(tk));
+        if (d < bestDiff) { bestDiff = d; bestIdx = i; }
+      }
+      const w = sim.snap[bestIdx];
+      const pts = [];
+      // Smooth by binning into log-i bins so the curve isn't visually noisy
+      const NBINS = 60;
+      const logMin = 0, logMax = Math.log10(D);
+      const binSums = new Float64Array(NBINS), binCounts = new Float64Array(NBINS);
+      for (let i = 0; i < D; i++) {
+        const li = Math.log10(i + 1);
+        const b = Math.min(NBINS - 1, Math.max(0, Math.floor((li - logMin) / (logMax - logMin) * NBINS)));
+        const e = (w[i] - sign * sim.ws[i]) ** 2;
+        binSums[b] += e; binCounts[b] += 1;
+      }
+      for (let b = 0; b < NBINS; b++) {
+        if (binCounts[b] === 0) continue;
+        const liMid = logMin + (logMax - logMin) * (b + 0.5) / NBINS;
+        const iMid = Math.pow(10, liMid);
+        const eMean = binSums[b] / binCounts[b];
+        pts.push({ i: iMid, e: eMean });
+      }
+      liveG.append('path').attr('d', lineGen(pts))
+        .attr('stroke', snapColors[k]).attr('stroke-width', 1.8).attr('fill', 'none').attr('opacity', 0.9);
+    });
+  }
+
+  return { update };
+}
+
+function renderTail(root) {
+  const plot = makeTailPlot(root.querySelector('svg.tail'));
+  const slider = root.querySelector('input[type="range"]');
+  const readout = root.querySelector('.readout');
+  function update(aVal) {
+    readout.textContent = aVal.toFixed(2);
+    plot.update(aVal);
+  }
+  slider.addEventListener('input', e => update(parseFloat(e.target.value)));
+  update(parseFloat(slider.value));
 }
 
 // ---------- u/s/MSE time-series ----------
@@ -1097,6 +1242,7 @@ renderHook(document.getElementById('hook'));
 renderLoss(document.getElementById('loss2d'));
 renderUS(document.getElementById('us-traj'));
 renderTimeSeries(document.getElementById('time-series'));
+renderTail(document.getElementById('tail'));
 </script>
 </body>
 </html>
