@@ -182,9 +182,9 @@ aside.legend dd { margin: 0; }
 
     <section id="s0">
       <h2><span class="num">&sect;0</span>Five training runs</h2>
-      <p class="lede">Five training runs on the same problem. Everything is identical except one knob, <em>a</em>, that controls the shape of the training data. The five learning curves come out dramatically different.</p>
+      <p class="lede">Five training runs on the same problem. The five plots below were all produced by the same gradient flow on the same loss with the same amount of noise. The only thing that changes between them is one parameter, <em>a</em>, and yet the curves come out wildly different. Working out why is what the rest of this page is about.</p>
 
-      <p>What does <em>a</em> control? Picture the training inputs as a cloud of points in many dimensions. <em>a</em> sets how that cloud is shaped. At <em>a</em> = 0 the cloud is a uniform fuzzy ball: every direction has the same spread. As <em>a</em> grows, the cloud gets stretched along one axis and squashed along the rest, until almost all the variation lives in a few directions. The bar plot below shows the variance along each axis (sometimes called the <em>spectrum</em>); the scatter shows what samples actually look like.</p>
+      <p>So what is <em>a</em> doing? Picture the training inputs as a cloud of points scattered through a high-dimensional space. The knob <em>a</em> controls how that cloud is shaped. At <em>a</em> = 0 it is a uniform fuzzy ball, with every direction having the same spread. Turn <em>a</em> up and the cloud starts getting stretched along one axis and squashed along the rest, until at large <em>a</em> almost all of the variation in the data lives in just a handful of dominant directions. The bar plot below shows the variance per axis (this is what people mean by the <em>spectrum</em> of the data), and the scatter cloud shows what real samples actually look like once the spectrum is steep enough to be visible.</p>
 
       <figure class="widget" id="hook">
         <div class="top-row">
