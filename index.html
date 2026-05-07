@@ -202,6 +202,32 @@ figure.widget .controls label { white-space: nowrap; }
       </ol>
     </section>
 
+    <section id="s2">
+      <h2><span class="num">&sect;2</span>Two numbers, not d</h2>
+
+      <p class="lede">&sect;1 worked in d = 2 where you can draw the surface. Real phase retrieval lives in d = 1000 (and bigger), where you can&rsquo;t. The good news: the loss boils down to just two numbers about w.</p>
+
+      <p>Track these as training proceeds:</p>
+      <ul>
+        <li><span class="mono">s</span> = &lang;w, Qw&rang;, the size of w measured in the data&rsquo;s own metric.</li>
+        <li><span class="mono">u</span> = &lang;w, Qw<sup>&star;</sup>&rang;, how aligned w is with the signal in the same metric.</li>
+      </ul>
+      <p>That&rsquo;s all the loss sees. So every training run, no matter how big d is, draws a path in the (u, s) plane.</p>
+
+      <figure class="widget" id="us-traj">
+        <div class="panel-label">training trajectories in (u, s), d = 1000</div>
+        <svg class="us" viewBox="0 0 720 400"></svg>
+        <div class="controls">
+          <label>a = <span class="readout">1.00</span></label>
+          <input type="range" min="0" max="2" step="0.05" value="1.0">
+        </div>
+      </figure>
+
+      <p>The five faded curves are the same five trajectories whose MSE you saw in &sect;0. The black curve is your slider&rsquo;s <em>a</em>. Each one starts near the origin (random init has u &asymp; 0, s &asymp; 0) and ends at the signal (u = s = 1).</p>
+
+      <p>The open circle at (0, 1/3) is the saddle from &sect;1, now in (u, s) coordinates. Random init places you near the s-axis, and the trajectory has to pass close to that saddle before u can grow toward 1. That bend is the plateau in &sect;0&rsquo;s curves.</p>
+    </section>
+
   </main>
 </div>
 
@@ -531,6 +557,119 @@ function makeScatterPlot(svgEl) {
   };
 }
 
+// ---------- (u, s) phase trajectory plot ----------
+function makeUSPlot(svgEl) {
+  const W = 720, H = 400;
+  const M = { top: 16, right: 60, bottom: 40, left: 60 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+  const x = d3.scaleLinear().domain([0, 1.15]).range([0, iw]);
+  const y = d3.scaleLinear().domain([0, 1.15]).range([ih, 0]);
+
+  // gridlines
+  const gridG = g.append('g').attr('class', 'grid');
+  [0.25, 0.5, 0.75, 1.0].forEach(v => {
+    gridG.append('line').attr('x1', x(v)).attr('x2', x(v)).attr('y1', 0).attr('y2', ih);
+    gridG.append('line').attr('x1', 0).attr('x2', iw).attr('y1', y(v)).attr('y2', y(v));
+  });
+
+  // frame
+  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+
+  // ticks
+  [0, 0.25, 0.5, 0.75, 1.0].forEach(v => {
+    g.append('line').attr('x1', x(v)).attr('x2', x(v)).attr('y1', ih).attr('y2', ih + 4).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', x(v)).attr('y', ih + 16).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(v);
+    g.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', -8).attr('y', y(v) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(v);
+  });
+
+  g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 32)
+    .attr('text-anchor', 'middle').text('u  (alignment with signal)');
+  g.append('text').attr('class', 'axis-label')
+    .attr('transform', `translate(-44,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle')
+    .text('s  (energy)');
+
+  // critical points
+  const annot = g.append('g');
+  // origin: starting region
+  annot.append('circle').attr('cx', x(0)).attr('cy', y(0))
+    .attr('r', 4).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+  annot.append('text').attr('x', x(0) + 9).attr('y', y(0) - 5)
+    .attr('font-family', 'var(--mono)').attr('font-size', 11).attr('fill', '#1a1a1f')
+    .text('origin');
+
+  // signal: star at (1, 1)
+  const star = d3.symbol().type(d3.symbolStar).size(140)();
+  annot.append('path').attr('transform', `translate(${x(1)},${y(1)})`).attr('d', star)
+    .attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+  annot.append('text').attr('x', x(1) - 9).attr('y', y(1) + 4)
+    .attr('text-anchor', 'end').attr('font-family', 'var(--mono)').attr('font-size', 11).attr('fill', '#1a1a1f')
+    .text('signal');
+
+  // saddle at (0, 1/3)
+  annot.append('circle').attr('cx', x(0)).attr('cy', y(1 / 3))
+    .attr('r', 4).attr('fill', 'none').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+  annot.append('text').attr('x', x(0) + 9).attr('y', y(1 / 3) + 4)
+    .attr('font-family', 'var(--mono)').attr('font-size', 11).attr('fill', '#1a1a1f')
+    .text('saddle (0, 1/3)');
+
+  // reference trajectories
+  const lineGen = d3.line().x(d => x(d.u)).y(d => y(d.s)).curve(d3.curveMonotoneX);
+  const refsG = g.append('g');
+  REFS.forEach(r => {
+    const sim = simulate({ a: r.a });
+    const pts = sim.t.map((_, i) => ({ u: sim.u[i], s: sim.s[i] }));
+    refsG.append('path').attr('d', lineGen(pts))
+      .attr('stroke', r.color).attr('stroke-width', 1.3).attr('fill', 'none').attr('opacity', 0.55);
+  });
+
+  const liveG = g.append('g');
+  let animFrame = null;
+
+  function update(aVal) {
+    if (animFrame) cancelAnimationFrame(animFrame);
+    liveG.selectAll('*').remove();
+    const sim = simulate({ a: aVal });
+    const pts = sim.t.map((_, i) => ({ u: sim.u[i], s: sim.s[i] }));
+
+    liveG.append('path').attr('d', lineGen(pts))
+      .attr('stroke', '#1a1a1f').attr('stroke-width', 2.4).attr('fill', 'none');
+    const dot = liveG.append('circle').attr('r', 5)
+      .attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+    let i = 0;
+    const stepPerFrame = Math.max(1, Math.ceil(pts.length / 120));
+    function step() {
+      i = Math.min(i + stepPerFrame, pts.length - 1);
+      dot.attr('cx', x(pts[i].u)).attr('cy', y(pts[i].s));
+      if (i < pts.length - 1) animFrame = requestAnimationFrame(step);
+      else animFrame = null;
+    }
+    step();
+  }
+
+  return { update };
+}
+
+function renderUS(root) {
+  const plot = makeUSPlot(root.querySelector('svg.us'));
+  const slider = root.querySelector('input[type="range"]');
+  const readout = root.querySelector('.readout');
+  function update(aVal) {
+    readout.textContent = aVal.toFixed(2);
+    plot.update(aVal);
+  }
+  slider.addEventListener('input', e => update(parseFloat(e.target.value)));
+  update(parseFloat(slider.value));
+}
+
 // ---------- Loss landscape (d = 2) ----------
 function makeLossPlot(svgEl) {
   const W = 440, H = 400;
@@ -772,6 +911,7 @@ function renderHook(root) {
 
 renderHook(document.getElementById('hook'));
 renderLoss(document.getElementById('loss2d'));
+renderUS(document.getElementById('us-traj'));
 </script>
 </body>
 </html>
