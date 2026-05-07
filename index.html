@@ -247,14 +247,14 @@ aside.legend dd { margin: 0; }
     <section id="s2">
       <h2><span class="num">&sect;2</span>Two numbers, not d</h2>
 
-      <p class="lede">&sect;1 worked in 2 dimensions because that&rsquo;s drawable. Real phase retrieval lives in many more (we&rsquo;ll use 1000) where the landscape can&rsquo;t be drawn. But the loss only depends on two numbers about the guess, so every trajectory is still a 2D path.</p>
+      <p class="lede">In &sect;1 we got away with two dimensions because the landscape was drawable, but real phase retrieval has 1000 (or more), and you can&rsquo;t draw a 1000-dimensional surface. The good news is that you don&rsquo;t have to. The loss only depends on two numbers about your current guess, so however many dimensions are involved, every training run is still just a path in 2D.</p>
 
-      <p>At every moment of training, two summary numbers describe where the guess is:</p>
+      <p>At each moment of training, those two summary numbers tell you where the guess is:</p>
       <ul>
-        <li><strong>alignment</strong>: how well the guess points along the answer. About 0 at random init; 1 when training is done. Plotted as <em>u</em> on plot axes.</li>
-        <li><strong>size</strong>: how big the guess is, weighted so high-variance directions count more. Tiny at init; 1 when done. Plotted as <em>s</em>.</li>
+        <li><strong>alignment</strong>: how well the guess points along the hidden answer. It starts near zero (a random direction is essentially uncorrelated with the answer) and grows toward one as training succeeds. Plotted as <em>u</em>.</li>
+        <li><strong>size</strong>: how big the guess is, with high-variance directions counted more heavily. It starts near zero (a random unit vector has tiny weighted norm in 1000 dimensions) and grows toward one when training is done. Plotted as <em>s</em>.</li>
       </ul>
-      <p>That&rsquo;s all the loss ever sees. Every training run draws a path in this 2D plane below.</p>
+      <p>That is it. Those two numbers are everything the loss ever sees. So no matter how big the dimension gets, training just traces a single curve in this 2D plane.</p>
 
       <figure class="widget" id="us-traj">
         <div class="panel-label">training trajectories in (u, s), d = 1000</div>
@@ -265,11 +265,11 @@ aside.legend dd { margin: 0; }
         </div>
       </figure>
 
-      <p>The five faded curves are the same five training runs from &sect;0, drawn in this 2D plane. The black curve is your slider&rsquo;s <em>a</em>. Each one starts near the origin (random init has tiny alignment and tiny size) and ends at the star where both equal 1.</p>
+      <p>The five faded curves are the five training runs from &sect;0, redrawn in this 2D plane. The black one is whatever <em>a</em> your slider is on. They all start near the origin (a random initial guess has tiny alignment and tiny size) and they all end at the star in the upper right, where alignment and size are both equal to one and training has converged.</p>
 
-      <p>The open circle at (0, 1/3) is the saddle from &sect;1, now in (alignment, size) coordinates. Random init places you near the size axis. The trajectory has to crawl up past the saddle before alignment can take off. That detour is the plateau in &sect;0&rsquo;s curves.</p>
+      <p>The open circle sitting at (0, 1/3) is the same saddle you met in &sect;1, just expressed in (alignment, size) coordinates instead of (w<sub>1</sub>, w<sub>2</sub>). Random init drops you near the lower-left corner, and the trajectory has to crawl up the size axis past that saddle before alignment is able to take off. That sluggish detour around the saddle is exactly the plateau you saw in &sect;0&rsquo;s curves.</p>
 
-      <p>What this picture doesn&rsquo;t show is how fast the dot is moving. That&rsquo;s the next section.</p>
+      <p>There&rsquo;s one thing this picture is hiding from you, though: how fast the dot is actually moving along that path. That&rsquo;s what the next section gets into.</p>
     </section>
 
     <section id="s3">
