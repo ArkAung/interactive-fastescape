@@ -301,6 +301,18 @@ figure.widget .controls label { white-space: nowrap; }
       <p>This is the answer to &sect;0. Five values of <em>a</em>, five trade-offs along these two curves, five different learning curves.</p>
     </section>
 
+    <section id="s6">
+      <h2><span class="num">&sect;6</span>Why this matters</h2>
+
+      <p class="lede">The paper isn&rsquo;t really about phase retrieval. It&rsquo;s about how the spectral structure of the data shapes a learning curve. Phase retrieval is the simplest nonlinear setting where the math is tractable end-to-end.</p>
+
+      <p>Neural networks trained on real data follow power-law scaling: error decays as a power of compute, dataset size, or model size, often consistent across orders of magnitude. Why those exponents, and how they relate to the data, has been a long-standing question.</p>
+
+      <p>For linear models and kernel methods, the picture has been understood for years: the spectral decay of the kernel sets the scaling exponents. What this paper does is extend the picture to a nonlinear, nonconvex setting with saddles and a sign-symmetric loss. The same trade-off you watched in &sect;5 falls out of the analysis as a closed-form result, with explicit scaling exponents in <em>a</em>.</p>
+
+      <p>Whether the same story holds for deep networks is open. But the shapes of the curves match the empirical phenomenology: long plateaus, sharp drops, slow power-law tails. The five training runs in &sect;0 are one instance of what scaling laws look like, and now you know exactly why they look like that.</p>
+    </section>
+
   </main>
 </div>
 
