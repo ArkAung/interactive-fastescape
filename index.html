@@ -275,7 +275,7 @@ aside.legend dd { margin: 0; }
     <section id="s3">
       <h2><span class="num">&sect;3</span>Three phases of training</h2>
 
-      <p class="lede">Plot the alignment (u), size (s), and MSE against time. Three distinct phases pop out, separated by two flat shoulders.</p>
+      <p class="lede">What &sect;2 was hiding is the timing. The dot moves along its path at a speed that varies enormously: it can crawl along for tens of thousands of steps and then cover most of the remaining distance in a few hundred. The cleanest way to see this is to just plot alignment, size, and MSE against time directly. When you do, three distinct phases jump out at you, separated by two flat shoulders.</p>
 
       <figure class="widget" id="time-series">
         <div class="panel-label">u(t) and s(t), linear</div>
@@ -289,18 +289,18 @@ aside.legend dd { margin: 0; }
       </figure>
 
       <ol>
-        <li><strong>Phase I: escape from the saddle.</strong> The alignment crawls upward from a tiny initial value (random init gives roughly 1/&radic;d for d-dimensional space). The dot in &sect;2 was lingering near (0, 1/3); on this plot the alignment line looks flat while the size line nudges up to about 1/3.</li>
-        <li><strong>Phase II: convergence.</strong> Once alignment escapes, both summary numbers sprint toward 1. The MSE drops fast.</li>
-        <li><strong>Phase III: the spectral tail.</strong> Alignment and size both pin at 1 (the &sect;2 dot is sitting at the star). But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude. Something is still happening that the two summary numbers don&rsquo;t capture.</li>
+        <li><strong>Phase I: escape from the saddle.</strong> Alignment crawls upward from a tiny initial value (random init gives you roughly 1/&radic;d, where d is the number of dimensions). The dot in &sect;2 was lingering near (0, 1/3) during this entire stretch, so on this plot the alignment line looks flat while the size line just drifts up to about 1/3 and stalls there.</li>
+        <li><strong>Phase II: rapid convergence.</strong> Once alignment finally escapes, both summary numbers sprint toward one in lockstep, and the MSE drops fast right along with them.</li>
+        <li><strong>Phase III: the spectral tail.</strong> Alignment and size are both pinned at one (the &sect;2 dot is now sitting right on top of the star), and as far as the two summary numbers are concerned, training is finished. But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude longer. Clearly something is still happening that those two summary numbers can&rsquo;t see.</li>
       </ol>
 
-      <p>That last point is what the next section is about.</p>
+      <p>That last point is the loose thread, and the next section pulls on it.</p>
     </section>
 
     <section id="s4">
       <h2><span class="num">&sect;4</span>The spectral tail</h2>
 
-      <p class="lede">After alignment and size both reach 1, the guess has the right size and the right alignment <em>on average</em>. But the guess has many components (one per dimension), and component-by-component, plenty of error remains. Plot the squared error of every component at five snapshots in time:</p>
+      <p class="lede">By the time those two summary numbers reach one, the guess has the right alignment and the right size <em>on average</em>. But the guess is really a vector with one entry per dimension, and on a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error of every single coordinate at five different points in training:</p>
 
       <figure class="widget" id="tail">
         <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times</div>
@@ -312,20 +312,20 @@ aside.legend dd { margin: 0; }
       </figure>
 
       <ol>
-        <li>The leftmost components (the high-variance directions of the data) drop to near-zero error first. They&rsquo;re learned at a rate set by their variance, which is large at the head of the spectrum.</li>
-        <li>The rightmost components (the low-variance directions) decay at a rate set by their tiny variance. They stay above zero for orders of magnitude longer.</li>
-        <li>For larger <em>a</em>, the gap between the largest and smallest variances grows. So the head learns faster, and the tail learns slower. Two effects, one parameter.</li>
+        <li>The leftmost coordinates correspond to the high-variance directions of the data, and they drop to near-zero error first. Each coordinate is learned at a rate set roughly by its variance, and at the head of the spectrum the variance is huge.</li>
+        <li>The rightmost coordinates are the low-variance directions, and by exactly the same logic they decay slowly. They stay above zero for orders of magnitude longer than the head does.</li>
+        <li>And here is the punchline: as you crank <em>a</em> up, the gap between the head and the tail variances grows. The head ends up learning faster <em>and</em> the tail learning slower at the same time. Two effects, one knob.</li>
       </ol>
 
-      <p>The MSE you saw in &sect;0 is just the average of these per-component errors. The plateau in MSE during Phase III is the tail being slowly chipped away.</p>
+      <p>The MSE plotted in &sect;0 is just the average of these per-coordinate squared errors. The MSE plateau during Phase III is the tail being slowly chipped away one coordinate at a time, with the slowest coordinates holding the average up.</p>
 
-      <p>Now we have half of &sect;0's puzzle: <em>why slow tail</em>. The other half is <em>why fast escape</em>. That's next.</p>
+      <p>So that&rsquo;s half of &sect;0&rsquo;s puzzle answered: <em>that&rsquo;s why the tail is slow</em>. What&rsquo;s still missing is the other half, namely why anisotropy speeds up the early escape too. That&rsquo;s the next section.</p>
     </section>
 
     <section id="s5">
       <h2><span class="num">&sect;5</span>The trade-off, in one picture</h2>
 
-      <p class="lede">Anisotropy is a single knob that pushes two rates in opposite directions. The escape rate from the saddle goes <em>up</em>; the tail-learning rate goes <em>down</em>. Same <em>a</em>, both effects.</p>
+      <p class="lede">This is where the two halves of the story come together. The single knob <em>a</em> pushes two different rates in opposite directions: as <em>a</em> grows, the rate at which alignment escapes from the saddle goes <em>up</em>, and the rate at which the tail of the spectrum gets learned goes <em>down</em>. Same parameter, two effects, working at cross purposes.</p>
 
       <figure class="widget" id="tradeoff">
         <div class="panel-label">two rates vs anisotropy <em>a</em></div>
@@ -336,23 +336,23 @@ aside.legend dd { margin: 0; }
         </div>
       </figure>
 
-      <p><strong>Escape rate</strong> (green): how fast alignment grows from near zero. As <em>a</em> increases, the data&rsquo;s variance concentrates onto a single dominant direction, which means the gradient near the saddle is concentrated there too. A random starting guess always has SOME component in that direction, and that component grows fast. Escape time shrinks.</p>
+      <p>The <strong>escape rate</strong> (green) is how quickly alignment grows from near zero, just after random initialisation. As <em>a</em> increases, the data&rsquo;s variance gets concentrated onto a single dominant direction, which means the gradient near the saddle ends up concentrated there too. Any random starting guess has at least <em>some</em> tiny component along that dominant direction, and that component grows fast. So the bigger <em>a</em> is, the faster you escape.</p>
 
-      <p><strong>Tail rate</strong> (red-brown): how fast the slowest component of the answer is learned. Each component is learned at a rate set by its variance in the data. As <em>a</em> grows, the lowest-variance component has almost no variance left, so it learns painfully slowly. That slow component holds the MSE up.</p>
+      <p>The <strong>tail rate</strong> (red-brown) is how quickly the slowest component of the answer is learned. Each component decays at a rate set by its variance in the data, and once <em>a</em> gets large the lowest-variance component has almost no variance left at all. So the slowest component decays painfully slowly, and it&rsquo;s what drags the MSE down through the entire spectral tail.</p>
 
-      <p>This is the answer to &sect;0. Five values of <em>a</em>, five trade-offs along these two curves, five different learning curves.</p>
+      <p>And that, finally, is the answer to &sect;0. Five different values of <em>a</em> land on five different points along these two curves, and out come five different learning curves.</p>
     </section>
 
     <section id="s6">
       <h2><span class="num">&sect;6</span>Why this matters</h2>
 
-      <p class="lede">The paper isn&rsquo;t really about phase retrieval. It&rsquo;s about how the spectral structure of the data shapes a learning curve. Phase retrieval is the simplest nonlinear setting where the math is tractable end-to-end.</p>
+      <p class="lede">The paper isn&rsquo;t really about phase retrieval, even though phase retrieval is the only thing it talks about. It&rsquo;s about how the spectral structure of training data shapes the entire learning curve. Phase retrieval is just the cleanest nonlinear setting where you can do the math from end to end.</p>
 
-      <p>Neural networks trained on real data follow power-law scaling: error decays as a power of compute, dataset size, or model size, often consistent across orders of magnitude. Why those exponents, and how they relate to the data, has been a long-standing question.</p>
+      <p>Real neural networks trained on real data follow power-law scaling laws: error drops as a power of compute, dataset size, or model size, often with exponents that stay remarkably consistent across many orders of magnitude. Where those exponents come from, and how they relate to the structure of the data, has been a long-standing question.</p>
 
-      <p>For linear models and kernel methods, the picture has been understood for years: the spectral decay of the kernel sets the scaling exponents. What this paper does is extend the picture to a nonlinear, nonconvex setting with saddles and a sign-symmetric loss. The same trade-off you watched in &sect;5 falls out of the analysis as a closed-form result, with explicit scaling exponents in <em>a</em>.</p>
+      <p>For linear models and kernel methods we&rsquo;ve known the answer for years: the spectral decay of the kernel sets the exponents. What this paper does is push the same picture into a nonlinear, nonconvex setting with saddles and a sign-symmetric loss. And the trade-off you watched in &sect;5 isn&rsquo;t just a numerical observation. It falls out of the paper&rsquo;s analysis as a closed-form result, with explicit scaling exponents in <em>a</em>.</p>
 
-      <p>Whether the same story holds for deep networks is open. But the shapes of the curves match the empirical phenomenology: long plateaus, sharp drops, slow power-law tails. The five training runs in &sect;0 are one instance of what scaling laws look like, and now you know exactly why they look like that.</p>
+      <p>Whether the same story carries over to deep neural networks is still open. But the shapes line up: long plateaus, sharp drops, slow power-law tails. The five training runs you saw at the top of the page are one rigorously understood instance of what scaling laws look like, and now you know exactly why they look that way.</p>
     </section>
 
   </main>
