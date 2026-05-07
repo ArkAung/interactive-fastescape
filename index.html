@@ -252,14 +252,14 @@ aside.legend dd { margin: 0; }
     <section id="s2">
       <h2><span class="num">&sect;2</span>Two numbers, not d</h2>
 
-      <p class="lede">&sect;1 worked in d = 2 where you can draw the surface. Real phase retrieval lives in d = 1000 (and bigger), where you can&rsquo;t. The good news: the loss boils down to just two numbers about w.</p>
+      <p class="lede">&sect;1 worked in 2 dimensions because that&rsquo;s drawable. Real phase retrieval lives in many more (we&rsquo;ll use 1000) where the landscape can&rsquo;t be drawn. But the loss only depends on two numbers about the guess, so every trajectory is still a 2D path.</p>
 
-      <p>Track these as training proceeds:</p>
+      <p>At every moment of training, two summary numbers describe where the guess is:</p>
       <ul>
-        <li><span class="mono">s</span> = &lang;w, Qw&rang;, the size of w measured in the data&rsquo;s own metric.</li>
-        <li><span class="mono">u</span> = &lang;w, Qw<sup>&star;</sup>&rang;, how aligned w is with the signal in the same metric.</li>
+        <li><strong>alignment</strong>: how well the guess points along the answer. About 0 at random init; 1 when training is done. Plotted as <em>u</em> on plot axes.</li>
+        <li><strong>size</strong>: how big the guess is, weighted so high-variance directions count more. Tiny at init; 1 when done. Plotted as <em>s</em>.</li>
       </ul>
-      <p>That&rsquo;s all the loss sees. So every training run, no matter how big d is, draws a path in the (u, s) plane.</p>
+      <p>That&rsquo;s all the loss ever sees. Every training run draws a path in this 2D plane below.</p>
 
       <figure class="widget" id="us-traj">
         <div class="panel-label">training trajectories in (u, s), d = 1000</div>
@@ -270,17 +270,17 @@ aside.legend dd { margin: 0; }
         </div>
       </figure>
 
-      <p>The five faded curves are the same five trajectories whose MSE you saw in &sect;0. The black curve is your slider&rsquo;s <em>a</em>. Each one starts near the origin (random init has u &asymp; 0, s &asymp; 0) and ends at the signal (u = s = 1).</p>
+      <p>The five faded curves are the same five training runs from &sect;0, drawn in this 2D plane. The black curve is your slider&rsquo;s <em>a</em>. Each one starts near the origin (random init has tiny alignment and tiny size) and ends at the star where both equal 1.</p>
 
-      <p>The open circle at (0, 1/3) is the saddle from &sect;1, now in (u, s) coordinates. Random init places you near the s-axis, and the trajectory has to pass close to that saddle before u can grow toward 1. That bend is the plateau in &sect;0&rsquo;s curves.</p>
+      <p>The open circle at (0, 1/3) is the saddle from &sect;1, now in (alignment, size) coordinates. Random init places you near the size axis. The trajectory has to crawl up past the saddle before alignment can take off. That detour is the plateau in &sect;0&rsquo;s curves.</p>
 
-      <p>What you can&rsquo;t see in this picture is <em>how fast</em> the dot is moving. That&rsquo;s the next section.</p>
+      <p>What this picture doesn&rsquo;t show is how fast the dot is moving. That&rsquo;s the next section.</p>
     </section>
 
     <section id="s3">
       <h2><span class="num">&sect;3</span>Three phases of training</h2>
 
-      <p class="lede">Plot u, s, and MSE as functions of time and three distinct phases pop out, with two flat shoulders and a sharp transition between them.</p>
+      <p class="lede">Plot the alignment (u), size (s), and MSE against time. Three distinct phases pop out, separated by two flat shoulders.</p>
 
       <figure class="widget" id="time-series">
         <div class="panel-label">u(t) and s(t), linear</div>
@@ -294,9 +294,9 @@ aside.legend dd { margin: 0; }
       </figure>
 
       <ol>
-        <li><strong>Phase I: escape from the saddle.</strong> u(t) crawls upward from u(0) &asymp; 1/&radic;d. The trajectory in &sect;2 was lingering near (0, 1/3); on this plot u looks flat and s nudges up to about 1/3.</li>
-        <li><strong>Phase II: convergence of (u, s).</strong> Once u escapes, both summary statistics sprint toward 1. The MSE drops fast.</li>
-        <li><strong>Phase III: the spectral tail.</strong> u and s pin at 1 (the dot in &sect;2 sits on top of the signal). But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude. Something is still happening that (u, s) is missing.</li>
+        <li><strong>Phase I: escape from the saddle.</strong> The alignment crawls upward from a tiny initial value (random init gives roughly 1/&radic;d for d-dimensional space). The dot in &sect;2 was lingering near (0, 1/3); on this plot the alignment line looks flat while the size line nudges up to about 1/3.</li>
+        <li><strong>Phase II: convergence.</strong> Once alignment escapes, both summary numbers sprint toward 1. The MSE drops fast.</li>
+        <li><strong>Phase III: the spectral tail.</strong> Alignment and size both pin at 1 (the &sect;2 dot is sitting at the star). But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude. Something is still happening that the two summary numbers don&rsquo;t capture.</li>
       </ol>
 
       <p>That last point is what the next section is about.</p>
@@ -305,7 +305,7 @@ aside.legend dd { margin: 0; }
     <section id="s4">
       <h2><span class="num">&sect;4</span>The spectral tail</h2>
 
-      <p class="lede">After (u, s) reach 1, the model has the right size and the right alignment <em>on average</em>. But coordinate by coordinate, work remains. Plot the squared error of every coordinate at five snapshots in time:</p>
+      <p class="lede">After alignment and size both reach 1, the guess has the right size and the right alignment <em>on average</em>. But the guess has many components (one per dimension), and component-by-component, plenty of error remains. Plot the squared error of every component at five snapshots in time:</p>
 
       <figure class="widget" id="tail">
         <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times</div>
@@ -317,12 +317,12 @@ aside.legend dd { margin: 0; }
       </figure>
 
       <ol>
-        <li>The leftmost coordinates (largest eigenvalues, biggest variance) drop to near zero error first. Gradient flow learns those at rate &asymp; &lambda;<sub>1</sub>, which is large.</li>
-        <li>The rightmost coordinates (smallest eigenvalues, tiny variance) decay at rate &asymp; &lambda;<sub>d</sub>, which is tiny. They stay above zero for orders of magnitude longer.</li>
-        <li>For larger <em>a</em>, the gap between &lambda;<sub>1</sub> and &lambda;<sub>d</sub> grows. So head learns faster, tail learns slower. Two effects, one parameter.</li>
+        <li>The leftmost components (the high-variance directions of the data) drop to near-zero error first. They&rsquo;re learned at a rate set by their variance, which is large at the head of the spectrum.</li>
+        <li>The rightmost components (the low-variance directions) decay at a rate set by their tiny variance. They stay above zero for orders of magnitude longer.</li>
+        <li>For larger <em>a</em>, the gap between the largest and smallest variances grows. So the head learns faster, and the tail learns slower. Two effects, one parameter.</li>
       </ol>
 
-      <p>The MSE you saw in &sect;0 is just the average of these per-coordinate errors. The plateau in MSE during Phase III is the tail being slowly chipped away.</p>
+      <p>The MSE you saw in &sect;0 is just the average of these per-component errors. The plateau in MSE during Phase III is the tail being slowly chipped away.</p>
 
       <p>Now we have half of &sect;0's puzzle: <em>why slow tail</em>. The other half is <em>why fast escape</em>. That's next.</p>
     </section>
@@ -341,9 +341,9 @@ aside.legend dd { margin: 0; }
         </div>
       </figure>
 
-      <p><strong>Escape rate</strong> (green): how fast u grows out of the saddle. With larger <em>a</em>, the data&rsquo;s variance concentrates on the top eigenvector, which means the gradient near the saddle is concentrated there too. Random init has a useful component in that direction, and that component grows fast. Escape time shrinks.</p>
+      <p><strong>Escape rate</strong> (green): how fast alignment grows from near zero. As <em>a</em> increases, the data&rsquo;s variance concentrates onto a single dominant direction, which means the gradient near the saddle is concentrated there too. A random starting guess always has SOME component in that direction, and that component grows fast. Escape time shrinks.</p>
 
-      <p><strong>Tail rate</strong> (red-brown): how fast the smallest-eigenvalue coordinate is learned. The decay rate for coordinate <em>i</em> is &asymp; &lambda;<sub>i</sub>. As <em>a</em> grows, &lambda;<sub>d</sub> goes to almost nothing, and the slowest coordinate drags the MSE down with it.</p>
+      <p><strong>Tail rate</strong> (red-brown): how fast the slowest component of the answer is learned. Each component is learned at a rate set by its variance in the data. As <em>a</em> grows, the lowest-variance component has almost no variance left, so it learns painfully slowly. That slow component holds the MSE up.</p>
 
       <p>This is the answer to &sect;0. Five values of <em>a</em>, five trade-offs along these two curves, five different learning curves.</p>
     </section>
