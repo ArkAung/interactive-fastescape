@@ -381,8 +381,44 @@ aside.legend dd { margin: 0; }
       <p>And that, finally, is the answer to &sect;0. Five different values of <em>a</em> land on five different points along these two curves, and out come five different learning curves.</p>
     </section>
 
-    <section id="s6">
-      <h2><span class="num">&sect;6</span>Why this matters</h2>
+    <section id="dashboard">
+      <h2><span class="num">&sect;6</span>The whole picture, all at once</h2>
+
+      <p class="lede">After seeing each aspect of the trajectory in its own section, here they all are synchronised. The top slider sets the spectrum exponent <em>a</em>; the bottom one sets the current moment in training. Drag the time slider, and the dot in the (u, s) plane walks along the path while vertical lines on the time-series plots track the same moment. Drag <em>a</em>, and the whole thing reshapes.</p>
+
+      <figure class="widget" id="dash">
+        <div class="dash-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
+          <div>
+            <div class="panel-label">(u, s) plane, dot at current t</div>
+            <svg class="d-us" viewBox="0 0 360 300"></svg>
+          </div>
+          <div>
+            <div class="panel-label">per-coordinate error at current t</div>
+            <svg class="d-tail" viewBox="0 0 360 300"></svg>
+          </div>
+        </div>
+        <div class="panel-label">u(t), s(t) and MSE(t) (vertical line marks current t)</div>
+        <svg class="d-time" viewBox="0 0 720 280"></svg>
+        <div class="controls">
+          <label>a = <span class="readout-a">1.00</span></label>
+          <input type="range" class="slider-a" min="0" max="2" step="0.05" value="1.0">
+        </div>
+        <div class="controls">
+          <label>time t = <span class="readout-t">10²</span></label>
+          <input type="range" class="slider-t" min="0" max="5" step="0.02" value="2">
+        </div>
+      </figure>
+
+      <p>Three things worth playing with:</p>
+      <ol>
+        <li>Hold <em>a</em> fixed and slide time. Watch the dot in (u, s) trace along the same path you saw in &sect;2 while the vertical line in the time-series tracks where you are. The three phases come back as a feel: the dot lingers near the saddle, then sprints to the star, and then sits at (1, 1) while the MSE keeps falling.</li>
+        <li>Slide <em>a</em>. Phase I shrinks, Phase III grows, and the (u, s) trajectory bends a bit. The per-coordinate error chart on the right reshapes its head and tail.</li>
+        <li>Pick a fixed time, say t = 10<sup>4</sup>, and slide <em>a</em>. Two trajectories at the exact same moment can be in completely different parts of training.</li>
+      </ol>
+    </section>
+
+    <section id="s7">
+      <h2><span class="num">&sect;7</span>Why this matters</h2>
 
       <p class="lede">The paper isn&rsquo;t really about phase retrieval, even though phase retrieval is the only thing it talks about. It&rsquo;s about how the spectral structure of training data shapes the entire learning curve. Phase retrieval is just the cleanest nonlinear setting where you can do the math from end to end.</p>
 
@@ -1358,6 +1394,203 @@ function renderUS(root) {
   update(parseFloat(slider.value));
 }
 
+// ---------- Dashboard with synchronized time scrubber ----------
+function makeDashboard(root) {
+  const D = 1000;
+  const usSvg = root.querySelector('svg.d-us');
+  const tailSvg = root.querySelector('svg.d-tail');
+  const timeSvg = root.querySelector('svg.d-time');
+  const aSlider = root.querySelector('.slider-a');
+  const tSlider = root.querySelector('.slider-t');
+  const aReadout = root.querySelector('.readout-a');
+  const tReadout = root.querySelector('.readout-t');
+
+  // ===== (u, s) panel =====
+  const usW = 360, usH = 300;
+  const usM = { top: 12, right: 18, bottom: 30, left: 44 };
+  const usIw = usW - usM.left - usM.right, usIh = usH - usM.top - usM.bottom;
+  const usG = d3.select(usSvg).append('g').attr('transform', `translate(${usM.left},${usM.top})`);
+  const usX = d3.scaleLinear().domain([0, 1.15]).range([0, usIw]);
+  const usY = d3.scaleLinear().domain([0, 1.15]).range([usIh, 0]);
+  usG.append('rect').attr('x', 0).attr('y', 0).attr('width', usIw).attr('height', usIh)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  [0, 0.5, 1.0].forEach(v => {
+    usG.append('line').attr('x1', 0).attr('x2', usIw).attr('y1', usY(v)).attr('y2', usY(v))
+      .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+    usG.append('line').attr('x1', usX(v)).attr('x2', usX(v)).attr('y1', 0).attr('y2', usIh)
+      .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+    usG.append('text').attr('x', usX(v)).attr('y', usIh + 14).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(v);
+    usG.append('text').attr('x', -8).attr('y', usY(v) + 4).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(v);
+  });
+  usG.append('text').attr('class', 'axis-label').attr('x', usIw / 2).attr('y', usIh + 26)
+    .attr('text-anchor', 'middle').text('u');
+  usG.append('text').attr('class', 'axis-label').attr('transform', `translate(-30,${usIh/2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').text('s');
+  // Annotations
+  const star = d3.symbol().type(d3.symbolStar).size(120)();
+  usG.append('path').attr('transform', `translate(${usX(1)},${usY(1)})`).attr('d', star)
+    .attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+  usG.append('circle').attr('cx', usX(0)).attr('cy', usY(1/3))
+    .attr('r', 4).attr('fill', 'none').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+  const usPathG = usG.append('g');
+  const usDotG = usG.append('g');
+  const usLine = d3.line().x(d => usX(d.u)).y(d => usY(d.s)).curve(d3.curveMonotoneX);
+
+  // ===== Per-coordinate error panel =====
+  const tlW = 360, tlH = 300;
+  const tlM = { top: 12, right: 18, bottom: 30, left: 50 };
+  const tlIw = tlW - tlM.left - tlM.right, tlIh = tlH - tlM.top - tlM.bottom;
+  const tlG = d3.select(tailSvg).append('g').attr('transform', `translate(${tlM.left},${tlM.top})`);
+  const tlX = d3.scaleLog().domain([1, D]).range([0, tlIw]);
+  const tlY = d3.scaleLog().domain([1e-6, 4]).range([tlIh, 0]);
+  const tlXTicks = [1, 10, 100, 1000];
+  const tlYTicks = [1e-6, 1e-4, 1e-2, 1];
+  tlG.append('rect').attr('x', 0).attr('y', 0).attr('width', tlIw).attr('height', tlIh)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  tlXTicks.forEach(t => {
+    tlG.append('line').attr('x1', tlX(t)).attr('x2', tlX(t)).attr('y1', 0).attr('y2', tlIh)
+      .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+    tlG.append('text').attr('x', tlX(t)).attr('y', tlIh + 14).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
+  });
+  tlYTicks.forEach(v => {
+    tlG.append('line').attr('x1', 0).attr('x2', tlIw).attr('y1', tlY(v)).attr('y2', tlY(v))
+      .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+    tlG.append('text').attr('x', -8).attr('y', tlY(v) + 4).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(v));
+  });
+  tlG.append('text').attr('class', 'axis-label').attr('x', tlIw / 2).attr('y', tlIh + 26)
+    .attr('text-anchor', 'middle').text('coord i');
+  tlG.append('text').attr('class', 'axis-label').attr('transform', `translate(-36,${tlIh/2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').text('error²');
+  const tailPathG = tlG.append('g');
+  const tailLine = d3.line().x(d => tlX(d.i)).y(d => tlY(Math.max(d.e, 1e-7))).curve(d3.curveMonotoneX);
+
+  // ===== Time series panel (u, s, MSE all in one) =====
+  const ttW = 720, ttH = 280;
+  const ttM = { top: 16, right: 80, bottom: 36, left: 60 };
+  const ttIw = ttW - ttM.left - ttM.right, ttIh = ttH - ttM.top - ttM.bottom;
+  const ttG = d3.select(timeSvg).append('g').attr('transform', `translate(${ttM.left},${ttM.top})`);
+  const ttX = d3.scaleLog().domain([1, 1e5]).range([0, ttIw]);
+  const ttYUS = d3.scaleLinear().domain([0, 1.15]).range([ttIh, 0]);
+  const ttYMSE = d3.scaleLog().domain([1e-4, 2]).range([ttIh, 0]);
+  const ttXTicks = [1, 10, 100, 1e3, 1e4, 1e5];
+
+  ttG.append('rect').attr('x', 0).attr('y', 0).attr('width', ttIw).attr('height', ttIh)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  ttXTicks.forEach(t => {
+    ttG.append('line').attr('x1', ttX(t)).attr('x2', ttX(t)).attr('y1', 0).attr('y2', ttIh)
+      .attr('stroke', '#e5dfcf').attr('stroke-dasharray', '2 3');
+    ttG.append('text').attr('x', ttX(t)).attr('y', ttIh + 16).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(t));
+  });
+  // Left axis: u, s [0,1]
+  [0, 0.5, 1.0].forEach(v => {
+    ttG.append('text').attr('x', -8).attr('y', ttYUS(v) + 4).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#4c2db3').text(v);
+  });
+  // Right axis: MSE log
+  [1e-4, 1e-2, 1].forEach(v => {
+    ttG.append('text').attr('x', ttIw + 8).attr('y', ttYMSE(v) + 4).attr('text-anchor', 'start')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#1a1a1f').text(expSup(v));
+  });
+  ttG.append('text').attr('class', 'axis-label').attr('x', ttIw / 2).attr('y', ttIh + 30)
+    .attr('text-anchor', 'middle').text('t');
+  ttG.append('text').attr('class', 'axis-label').attr('transform', `translate(-44,${ttIh/2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', '#4c2db3').text('u, s');
+  ttG.append('text').attr('class', 'axis-label').attr('transform', `translate(${ttIw + 38},${ttIh/2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('fill', '#1a1a1f').text('MSE');
+  const ttPathG = ttG.append('g');
+  const ttCursorG = ttG.append('g');
+  const uLine = d3.line().defined(d => d.t >= 1).x(d => ttX(d.t)).y(d => ttYUS(d.u)).curve(d3.curveMonotoneX);
+  const sLine = d3.line().defined(d => d.t >= 1).x(d => ttX(d.t)).y(d => ttYUS(d.s)).curve(d3.curveMonotoneX);
+  const mLine = d3.line().defined(d => d.mse > 1e-4 && d.t >= 1).x(d => ttX(d.t)).y(d => ttYMSE(d.mse)).curve(d3.curveMonotoneX);
+
+  let currentSim = null;
+  let currentSign = 1;
+
+  function update_a(aVal) {
+    aReadout.textContent = aVal.toFixed(2);
+    currentSim = simulate({ a: aVal, withSnapshots: true });
+    // Determine global sign from final snapshot
+    const last = currentSim.snap[currentSim.snap.length - 1];
+    let mp = 0, mn = 0;
+    for (let i = 0; i < D; i++) {
+      const dp = last[i] - currentSim.ws[i];
+      const dn = last[i] + currentSim.ws[i];
+      mp += dp * dp; mn += dn * dn;
+    }
+    currentSign = mp <= mn ? 1 : -1;
+
+    // (u, s) trajectory
+    const usPts = currentSim.t.map((_, i) => ({ u: currentSim.u[i], s: currentSim.s[i] }));
+    usPathG.selectAll('*').remove();
+    usPathG.append('path').attr('d', usLine(usPts))
+      .attr('stroke', '#1a1a1f').attr('stroke-width', 2).attr('fill', 'none');
+
+    // Time series curves
+    const tsPts = currentSim.t.map((t, i) => ({ t, u: currentSim.u[i], s: currentSim.s[i], mse: currentSim.mse[i] }));
+    ttPathG.selectAll('*').remove();
+    ttPathG.append('path').attr('d', uLine(tsPts)).attr('stroke', '#4c2db3').attr('stroke-width', 2).attr('fill', 'none');
+    ttPathG.append('path').attr('d', sLine(tsPts)).attr('stroke', '#c8632b').attr('stroke-width', 2).attr('fill', 'none');
+    ttPathG.append('path').attr('d', mLine(tsPts)).attr('stroke', '#1a1a1f').attr('stroke-width', 2).attr('fill', 'none').attr('stroke-dasharray', '4 3');
+
+    update_t(parseFloat(tSlider.value));
+  }
+
+  function update_t(logT) {
+    if (!currentSim) return;
+    const tValue = Math.pow(10, logT);
+    tReadout.textContent = `10^${logT.toFixed(1)}`;
+
+    let bestIdx = 0, bestDiff = Infinity;
+    for (let i = 0; i < currentSim.t.length; i++) {
+      const dd = Math.abs(Math.log10(Math.max(currentSim.t[i], 1)) - logT);
+      if (dd < bestDiff) { bestDiff = dd; bestIdx = i; }
+    }
+
+    // (u, s) dot
+    usDotG.selectAll('*').remove();
+    usDotG.append('circle').attr('cx', usX(currentSim.u[bestIdx])).attr('cy', usY(currentSim.s[bestIdx]))
+      .attr('r', 6).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+
+    // Per-coord error
+    const w = currentSim.snap[bestIdx];
+    const NBINS = 60;
+    const logMin = 0, logMax = Math.log10(D);
+    const binSums = new Float64Array(NBINS), binCounts = new Float64Array(NBINS);
+    for (let i = 0; i < D; i++) {
+      const li = Math.log10(i + 1);
+      const b = Math.min(NBINS - 1, Math.max(0, Math.floor((li - logMin) / (logMax - logMin) * NBINS)));
+      const e = (w[i] - currentSign * currentSim.ws[i]) ** 2;
+      binSums[b] += e; binCounts[b] += 1;
+    }
+    const tailPts = [];
+    for (let b = 0; b < NBINS; b++) {
+      if (binCounts[b] === 0) continue;
+      const liMid = logMin + (logMax - logMin) * (b + 0.5) / NBINS;
+      tailPts.push({ i: Math.pow(10, liMid), e: binSums[b] / binCounts[b] });
+    }
+    tailPathG.selectAll('*').remove();
+    tailPathG.append('path').attr('d', tailLine(tailPts))
+      .attr('stroke', '#9a4419').attr('stroke-width', 2.2).attr('fill', 'none');
+
+    // Time series cursor
+    ttCursorG.selectAll('*').remove();
+    if (tValue >= 1 && tValue <= 1e5) {
+      ttCursorG.append('line').attr('x1', ttX(tValue)).attr('x2', ttX(tValue)).attr('y1', 0).attr('y2', ttIh)
+        .attr('stroke', '#1a1a1f').attr('stroke-width', 1).attr('opacity', 0.7);
+    }
+  }
+
+  aSlider.addEventListener('input', e => update_a(parseFloat(e.target.value)));
+  tSlider.addEventListener('input', e => update_t(parseFloat(e.target.value)));
+
+  update_a(parseFloat(aSlider.value));
+}
+
 // ---------- "Try it yourself" recovery widget ----------
 function makeRecoverWidget(root) {
   const canvas = root.querySelector('canvas');
@@ -1970,6 +2203,7 @@ renderUS(document.getElementById('us-traj'));
 renderTimeSeries(document.getElementById('time-series'));
 renderTail(document.getElementById('tail'));
 renderTradeoff(document.getElementById('tradeoff'));
+makeDashboard(document.getElementById('dash'));
 </script>
 </body>
 </html>
