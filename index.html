@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+  }
+}
+</script>
 <style>
 :root {
   --bg: #f7f4ec;
@@ -193,8 +201,8 @@ aside.legend dd { margin: 0; }
             <svg class="spec" viewBox="0 0 460 200"></svg>
           </div>
           <div>
-            <div class="panel-label">a sample of x</div>
-            <svg class="scatter" viewBox="0 0 220 220"></svg>
+            <div class="panel-label">data cloud (drag to rotate)</div>
+            <div class="cloud3d" style="aspect-ratio: 1; width: 100%; background: #fbf9f3; border: 1px solid var(--rule);"></div>
           </div>
         </div>
         <div class="panel-label">learning curve, MSE(t)</div>
@@ -360,6 +368,8 @@ aside.legend dd { margin: 0; }
 
 <script type="module">
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ---------- RNG ----------
 function mulberry32(seed) {
@@ -503,6 +513,139 @@ function spectrum(a, D = 1000) {
   for (let i = 0; i < D; i++) { lam[i] = Math.pow(i + 1, -a); sum += lam[i]; }
   for (let i = 0; i < D; i++) lam[i] /= sum;
   return lam;
+}
+
+// ---------- 3D data cloud (rotatable) ----------
+function makeCloud3D(container) {
+  const N_SAMPLES = 320;
+  const D = 1000;
+  const COORDS = [0, 4, 49];          // axis 1: top eigenvalue, axis 2: 5th, axis 3: 50th
+  const AXIS_LABELS = ['i = 1', 'i = 5', 'i = 50'];
+
+  // Fixed standard normal samples (so the cloud doesn't reshuffle on slider)
+  const rng = mulberry32(11);
+  const randn = () => {
+    let u = 0, v = 0;
+    while (u === 0) u = rng();
+    while (v === 0) v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const samples = new Float32Array(N_SAMPLES * 3);
+  for (let i = 0; i < N_SAMPLES; i++) {
+    samples[i*3]   = randn();
+    samples[i*3+1] = randn();
+    samples[i*3+2] = randn();
+  }
+
+  const w0 = container.clientWidth || 220;
+  const h0 = container.clientHeight || 220;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xfbf9f3);
+
+  const camera = new THREE.PerspectiveCamera(38, w0 / h0, 0.05, 100);
+  camera.position.set(2.6, 1.7, 2.6);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(w0, h0);
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  container.appendChild(renderer.domElement);
+
+  const ro = new ResizeObserver(() => {
+    const cw = container.clientWidth, ch = container.clientHeight;
+    if (cw === 0 || ch === 0) return;
+    renderer.setSize(cw, ch);
+    camera.aspect = cw / ch;
+    camera.updateProjectionMatrix();
+  });
+  ro.observe(container);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+  controls.enablePan = false;
+  controls.minDistance = 1.6;
+  controls.maxDistance = 6;
+  controls.autoRotate = false;
+
+  // Axes
+  const axisLen = 1.1;
+  function addAxis(dir, color) {
+    const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(...dir)];
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    scene.add(new THREE.Line(geom, new THREE.LineBasicMaterial({ color })));
+  }
+  addAxis([axisLen, 0, 0], 0x9a9486);
+  addAxis([0, axisLen, 0], 0x9a9486);
+  addAxis([0, 0, axisLen], 0x9a9486);
+
+  // Axis labels via HTML overlays
+  const labels = AXIS_LABELS.map((text) => {
+    const el = document.createElement('div');
+    el.className = 'cloud-axis-label';
+    el.textContent = text;
+    el.style.cssText = 'position:absolute;font-family:var(--mono);font-size:10px;color:var(--muted);pointer-events:none;transform:translate(-50%,-50%);';
+    container.appendChild(el);
+    return el;
+  });
+  // Make container relative for absolute label positioning
+  container.style.position = 'relative';
+  container.style.overflow = 'hidden';
+
+  const labelTargets = [
+    new THREE.Vector3(axisLen + 0.1, 0, 0),
+    new THREE.Vector3(0, axisLen + 0.1, 0),
+    new THREE.Vector3(0, 0, axisLen + 0.1)
+  ];
+
+  // Particle cloud
+  const positions = new Float32Array(N_SAMPLES * 3);
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0x4c2db3,
+    size: 0.045,
+    transparent: true,
+    opacity: 0.85,
+    sizeAttenuation: true
+  });
+  const points = new THREE.Points(geom, mat);
+  scene.add(points);
+
+  function projectLabels() {
+    const cw = container.clientWidth, ch = container.clientHeight;
+    labelTargets.forEach((v, i) => {
+      const p = v.clone().project(camera);
+      const x = (p.x * 0.5 + 0.5) * cw;
+      const y = (1 - (p.y * 0.5 + 0.5)) * ch;
+      labels[i].style.left = x + 'px';
+      labels[i].style.top = y + 'px';
+    });
+  }
+
+  function loop() {
+    controls.update();
+    renderer.render(scene, camera);
+    projectLabels();
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  function update(aVal) {
+    const lam = spectrum(aVal, D);
+    const sigs = COORDS.map(c => Math.sqrt(lam[c]));
+    const sigMax = Math.max(...sigs);
+    const SCALE = 0.9 / sigMax;
+    for (let i = 0; i < N_SAMPLES; i++) {
+      positions[i*3]   = samples[i*3]   * sigs[0] * SCALE;
+      positions[i*3+1] = samples[i*3+1] * sigs[1] * SCALE;
+      positions[i*3+2] = samples[i*3+2] * sigs[2] * SCALE;
+    }
+    geom.attributes.position.needsUpdate = true;
+  }
+
+  return { update };
 }
 
 // ---------- MSE plot ----------
@@ -1408,7 +1551,7 @@ function renderLoss(root) {
 function renderHook(root) {
   const mse = makeMSEPlot(root.querySelector('svg.mse'));
   const spec = makeSpectrumPlot(root.querySelector('svg.spec'));
-  const scatter = makeScatterPlot(root.querySelector('svg.scatter'));
+  const cloud = makeCloud3D(root.querySelector('.cloud3d'));
 
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
@@ -1416,7 +1559,7 @@ function renderHook(root) {
   function update(aVal) {
     readout.textContent = aVal.toFixed(2);
     spec.update(aVal);
-    scatter.update(aVal);
+    cloud.update(aVal);
     mse.update(aVal);
   }
 
