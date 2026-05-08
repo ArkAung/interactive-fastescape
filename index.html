@@ -235,7 +235,9 @@ aside.legend dd { margin: 0; }
       <p class="lede">Training is just an optimization problem. There&rsquo;s a loss function L(w), and you want a setting of w that makes it as small as you can get it. The way to picture this is to imagine the loss as a hilly landscape: every possible w is a position on the ground, and the height there is the loss value. Training rolls a ball downhill until it stops at a minimum. We can&rsquo;t draw the landscape for 1000-dimensional phase retrieval, but we can draw it in 2D. Click anywhere on the picture below to drop a ball and watch where it ends up.</p>
 
       <figure class="widget" id="loss2d">
-        <div class="panel-label">click to drop a starting guess; the dot rolls downhill</div>
+        <div class="panel-label">3D loss surface (drag to rotate, click on the surface to drop a guess)</div>
+        <div class="loss3d-stage" style="aspect-ratio: 1.5; width: 100%; background: #fbf9f3; border: 1px solid var(--rule); position: relative; overflow: hidden;"></div>
+        <div class="panel-label" style="margin-top: 10px;">top-down view (click anywhere to drop a guess)</div>
         <svg class="loss" viewBox="0 0 440 400"></svg>
         <div class="controls">
           <label>anisotropy a = <span class="readout">2.00</span></label>
@@ -1328,6 +1330,252 @@ function renderUS(root) {
   update(parseFloat(slider.value));
 }
 
+// ---------- Trajectory helper for d = 2 phase retrieval ----------
+function traj2D(w0, lam1, lam2, ws, sStar) {
+  const path = [w0.slice()];
+  const w = w0.slice();
+  const dt = 0.04;
+  for (let k = 0; k < 4000; k++) {
+    const s = lam1 * w[0] * w[0] + lam2 * w[1] * w[1];
+    const u = lam1 * w[0] * ws[0] + lam2 * w[1] * ws[1];
+    const fac = 4 * (sStar - 3 * s);
+    const dw0 = lam1 * (fac * w[0] + 8 * u * ws[0]);
+    const dw1 = lam2 * (fac * w[1] + 8 * u * ws[1]);
+    w[0] += dw0 * dt;
+    w[1] += dw1 * dt;
+    if (Math.abs(w[0]) > 5 || Math.abs(w[1]) > 5) break;
+    if (k % 8 === 0) path.push(w.slice());
+    const dPlus = (w[0] - ws[0]) ** 2 + (w[1] - ws[1]) ** 2;
+    const dMinus = (w[0] + ws[0]) ** 2 + (w[1] + ws[1]) ** 2;
+    if (Math.min(dPlus, dMinus) < 1e-4) break;
+  }
+  return path;
+}
+
+// ---------- 3D loss surface (rotatable, clickable) ----------
+function makeLossSurface3D(container) {
+  const N = 70;
+  const RANGE = 1.5;
+  const ws = [1.0, 0.5];
+  let lam1 = 0.5, lam2 = 0.5, sStar = lam1 * ws[0] * ws[0] + lam2 * ws[1] * ws[1];
+  let lminCache = 0, heightScaleCache = 1;
+
+  function computeL(w1, w2) {
+    const s = lam1 * w1 * w1 + lam2 * w2 * w2;
+    const u = lam1 * w1 * ws[0] + lam2 * w2 * ws[1];
+    return 3 * s * s + 3 * sStar * sStar - 4 * u * u - 2 * sStar * s;
+  }
+
+  const w0 = container.clientWidth || 640;
+  const h0 = container.clientHeight || 420;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xfbf9f3);
+
+  const camera = new THREE.PerspectiveCamera(40, w0 / h0, 0.05, 100);
+  camera.position.set(2.6, 2.4, 3.4);
+  camera.lookAt(0, 0.25, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(w0, h0);
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  container.appendChild(renderer.domElement);
+
+  const ro = new ResizeObserver(() => {
+    const cw = container.clientWidth, ch = container.clientHeight;
+    if (!cw || !ch) return;
+    renderer.setSize(cw, ch);
+    camera.aspect = cw / ch;
+    camera.updateProjectionMatrix();
+  });
+  ro.observe(container);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+  controls.target.set(0, 0.25, 0);
+  controls.minDistance = 2;
+  controls.maxDistance = 8;
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  scene.add(ambient);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.85);
+  dir.position.set(2, 5, 3);
+  scene.add(dir);
+
+  // Surface buffers
+  const positions = new Float32Array(N * N * 3);
+  const colors = new Float32Array(N * N * 3);
+  const indices = [];
+  for (let j = 0; j < N - 1; j++) {
+    for (let i = 0; i < N - 1; i++) {
+      const a = j * N + i, b = j * N + (i + 1);
+      const c = (j + 1) * N + i, d = (j + 1) * N + (i + 1);
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  const surfGeom = new THREE.BufferGeometry();
+  surfGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  surfGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  surfGeom.setIndex(indices);
+  const surfMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const surf = new THREE.Mesh(surfGeom, surfMat);
+  scene.add(surf);
+
+  // Markers
+  function sphereMarker(color, radius) {
+    const g = new THREE.SphereGeometry(radius, 18, 18);
+    const m = new THREE.MeshLambertMaterial({ color });
+    return new THREE.Mesh(g, m);
+  }
+  const markerOrigin = sphereMarker(0xffffff, 0.06);
+  scene.add(markerOrigin);
+  const markerStars = [sphereMarker(0xffd14a, 0.08), sphereMarker(0xffd14a, 0.08)];
+  markerStars.forEach(m => scene.add(m));
+  const markerSaddles = [sphereMarker(0x9a9486, 0.05), sphereMarker(0x9a9486, 0.05)];
+  markerSaddles.forEach(m => scene.add(m));
+
+  function colorAt(t) {
+    const c = d3.color(d3.interpolateViridis(t));
+    return [c.r / 255, c.g / 255, c.b / 255];
+  }
+
+  function buildSurface() {
+    const Lvals = new Float64Array(N * N);
+    const step = 2 * RANGE / (N - 1);
+    let lmin = Infinity, lmax = -Infinity;
+    for (let j = 0; j < N; j++) {
+      const w2 = -RANGE + j * step;
+      for (let i = 0; i < N; i++) {
+        const w1 = -RANGE + i * step;
+        const L = computeL(w1, w2);
+        Lvals[j * N + i] = L;
+        if (L < lmin) lmin = L;
+        if (L > lmax) lmax = L;
+      }
+    }
+    const heightScale = 0.6 / Math.max(lmax - lmin, 1e-6);
+    for (let j = 0; j < N; j++) {
+      const w2 = -RANGE + j * step;
+      for (let i = 0; i < N; i++) {
+        const w1 = -RANGE + i * step;
+        const L = Lvals[j * N + i];
+        const t = Math.sqrt(Math.max(0, (L - lmin) / Math.max(lmax - lmin, 1e-6)));
+        const idx = j * N + i;
+        positions[idx * 3]     = w1;
+        positions[idx * 3 + 1] = (L - lmin) * heightScale;
+        positions[idx * 3 + 2] = w2;
+        const [r, g, b] = colorAt(t);
+        colors[idx * 3]     = r;
+        colors[idx * 3 + 1] = g;
+        colors[idx * 3 + 2] = b;
+      }
+    }
+    surfGeom.attributes.position.needsUpdate = true;
+    surfGeom.attributes.color.needsUpdate = true;
+    surfGeom.computeVertexNormals();
+
+    lminCache = lmin;
+    heightScaleCache = heightScale;
+
+    const markY = (w1, w2) => (computeL(w1, w2) - lmin) * heightScale + 0.045;
+    markerOrigin.position.set(0, markY(0, 0), 0);
+    markerStars[0].position.set(ws[0], markY(ws[0], ws[1]), ws[1]);
+    markerStars[1].position.set(-ws[0], markY(-ws[0], -ws[1]), -ws[1]);
+    const m = -(lam2 * ws[1]) / (lam1 * ws[0]);
+    const sTarget = sStar / 3;
+    const denom = lam1 * m * m + lam2;
+    if (denom > 0 && sTarget > 0) {
+      const sw2 = Math.sqrt(sTarget / denom);
+      const sw1 = m * sw2;
+      markerSaddles[0].position.set(sw1, markY(sw1, sw2), sw2);
+      markerSaddles[1].position.set(-sw1, markY(-sw1, -sw2), -sw2);
+    }
+  }
+  buildSurface();
+
+  // Trajectory
+  let trajLine = null, trajDot = null, trajRAF = null;
+
+  function showTrajectory(path) {
+    if (trajLine) { scene.remove(trajLine); trajLine.geometry.dispose(); trajLine.material.dispose(); trajLine = null; }
+    if (trajDot)  { scene.remove(trajDot);  trajDot.geometry.dispose();  trajDot.material.dispose();  trajDot = null; }
+    if (trajRAF) { cancelAnimationFrame(trajRAF); trajRAF = null; }
+
+    const pts3 = path.map(([w1, w2]) => {
+      const L = computeL(w1, w2);
+      const y = (L - lminCache) * heightScaleCache + 0.04;
+      return new THREE.Vector3(w1, y, w2);
+    });
+    const lineGeom = new THREE.BufferGeometry().setFromPoints(pts3);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x1a1a1f });
+    trajLine = new THREE.Line(lineGeom, lineMat);
+    scene.add(trajLine);
+
+    const dotGeom = new THREE.SphereGeometry(0.05, 18, 18);
+    const dotMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1f });
+    trajDot = new THREE.Mesh(dotGeom, dotMat);
+    scene.add(trajDot);
+
+    let i = 0;
+    const stepPerFrame = Math.max(1, Math.ceil(pts3.length / 120));
+    function step() {
+      i = Math.min(i + stepPerFrame, pts3.length - 1);
+      trajDot.position.copy(pts3[i]);
+      if (i < pts3.length - 1) trajRAF = requestAnimationFrame(step);
+      else trajRAF = null;
+    }
+    step();
+  }
+
+  // Click-to-place via raycasting
+  const raycaster = new THREE.Raycaster();
+  const mouseV = new THREE.Vector2();
+  let dragStart = null;
+
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    dragStart = { x: e.clientX, y: e.clientY };
+  });
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    if (!dragStart) return;
+    const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+    dragStart = null;
+    if (dx * dx + dy * dy > 36) return;   // ignore drags
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseV.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseV.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouseV, camera);
+    const hits = raycaster.intersectObject(surf);
+    if (hits.length > 0) {
+      const p = hits[0].point;
+      const w1 = p.x, w2 = p.z;
+      if (Math.hypot(w1, w2) < 1e-3) return;
+      showTrajectory(traj2D([w1, w2], lam1, lam2, ws, sStar));
+    }
+  });
+
+  function loop() {
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  function update(aVal) {
+    const lam1Raw = Math.pow(1, -aVal), lam2Raw = Math.pow(2, -aVal);
+    const lamSum = lam1Raw + lam2Raw;
+    lam1 = lam1Raw / lamSum;
+    lam2 = lam2Raw / lamSum;
+    sStar = lam1 * ws[0] * ws[0] + lam2 * ws[1] * ws[1];
+    buildSurface();
+    if (trajLine) { scene.remove(trajLine); trajLine = null; }
+    if (trajDot)  { scene.remove(trajDot); trajDot = null; }
+    if (trajRAF)  { cancelAnimationFrame(trajRAF); trajRAF = null; }
+  }
+
+  return { update };
+}
+
 // ---------- Loss landscape (d = 2) ----------
 function makeLossPlot(svgEl) {
   const W = 440, H = 400;
@@ -1536,11 +1784,13 @@ function makeLossPlot(svgEl) {
 }
 
 function renderLoss(root) {
+  const surface3d = makeLossSurface3D(root.querySelector('.loss3d-stage'));
   const plot = makeLossPlot(root.querySelector('svg.loss'));
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
   function update(aVal) {
     readout.textContent = aVal.toFixed(2);
+    surface3d.update(aVal);
     plot.update(aVal);
   }
   slider.addEventListener('input', e => update(parseFloat(e.target.value)));
