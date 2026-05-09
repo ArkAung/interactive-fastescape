@@ -381,6 +381,29 @@ aside.legend dd { margin: 0; }
       <p>And that, finally, is the answer to &sect;0. Five different values of <em>a</em> land on five different points along these two curves, and out come five different learning curves.</p>
     </section>
 
+    <section id="closure">
+      <h2>Behind the math</h2>
+
+      <p class="lede">If &sect;2 told you the loss only depends on two numbers, you might reasonably be wondering why the paper needs thirty pages of math. Here&rsquo;s the catch: the loss only depends on (u, s), but the <em>dynamics</em> of (u, s) themselves do not.</p>
+
+      <p>Look at how the size <em>s</em> evolves. Differentiating the definition s = &sum;<sub>i</sub> &lambda;<sub>i</sub> w<sub>i</sub><sup>2</sup> with respect to time gives an expression that involves &sum;<sub>i</sub> &lambda;<sub>i</sub><sup>2</sup> w<sub>i</sub><sup>2</sup>, which is a higher-order moment, call it s<sup>(2)</sup>. To predict s, you need s<sup>(2)</sup>. To predict s<sup>(2)</sup>, you need s<sup>(3)</sup>. And so on. There is no clean ODE for (u, s) alone.</p>
+
+      <p>Unless something special collapses the cascade. And in the isotropic case, something does: when all eigenvalues are equal, every higher moment is just the first one rescaled, so the whole tower collapses into a 2D ODE in (u, s). For anisotropic data the eigenvalues differ, the moments are independent, and the dynamics genuinely live in an infinite-dimensional space. The paper&rsquo;s machinery (Duhamel&rsquo;s formula, Volterra integral equations, phase-by-phase approximations) is the technology built to handle that.</p>
+
+      <p>You can see the closure break by plotting the moments s, s<sup>(2)</sup>, s<sup>(3)</sup>, s<sup>(4)</sup> over time. At <em>a</em> = 0 they&rsquo;re parallel lines on log-y (same shape, different vertical offsets), so knowing one tells you all the others. As <em>a</em> grows the lines bend into different shapes, each one carrying genuinely new information.</p>
+
+      <figure class="widget" id="closure-widget">
+        <div class="panel-label">moments s<sup>(k)</sup>(t) = &sum; &lambda;<sub>i</sub><sup>k</sup> w<sub>i</sub><sup>2</sup>(t) for k = 1..4</div>
+        <svg class="closure" viewBox="0 0 720 380"></svg>
+        <div class="controls">
+          <label>a = <span class="readout">0.50</span></label>
+          <input type="range" min="0" max="2" step="0.05" value="0.5">
+        </div>
+      </figure>
+
+      <p>Slide <em>a</em> from 0 upward. At <em>a</em> = 0 all four curves are parallel on log-y, so the closure holds. By <em>a</em> = 1 the curves are clearly diverging in shape. By <em>a</em> = 2 they look like four genuinely different stories. That divergence is the entire reason this paper is hard.</p>
+    </section>
+
     <section id="dashboard">
       <h2><span class="num">&sect;6</span>The whole picture, all at once</h2>
 
@@ -1059,10 +1082,13 @@ function makeTailPlot(svgEl) {
       .attr('fill', '#333').text(`t = ${expSup(t)}`);
   });
 
-  const liveG = g.append('g');
+  const tailClipId = 'tail-clip-' + Math.floor(Math.random() * 1e6);
+  g.append('defs').append('clipPath').attr('id', tailClipId)
+    .append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih);
+  const liveG = g.append('g').attr('clip-path', `url(#${tailClipId})`);
   const lineGen = d3.line()
-    .x(d => x(d.i)).y(d => y(Math.max(d.e, 1e-7)))
-    .defined(d => d.e > 1e-7)
+    .x(d => x(d.i)).y(d => y(Math.max(d.e, 1e-6)))
+    .defined(d => d.e > 1e-6)
     .curve(d3.curveMonotoneX);
 
   function update(aVal) {
@@ -1384,6 +1410,95 @@ function makeUSPlot(svgEl) {
 
 function renderUS(root) {
   const plot = makeUSPlot(root.querySelector('svg.us'));
+  const slider = root.querySelector('input[type="range"]');
+  const readout = root.querySelector('.readout');
+  function update(aVal) {
+    readout.textContent = aVal.toFixed(2);
+    plot.update(aVal);
+  }
+  slider.addEventListener('input', e => update(parseFloat(e.target.value)));
+  update(parseFloat(slider.value));
+}
+
+// ---------- Closure: higher-order moments ----------
+function makeClosurePlot(svgEl) {
+  const D = 1000;
+  const W = 720, H = 380;
+  const M = { top: 16, right: 100, bottom: 40, left: 60 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
+
+  const x = d3.scaleLog().domain([1, 1e5]).range([0, iw]);
+  const y = d3.scaleLog().domain([1e-10, 5]).range([ih, 0]);
+  const xTicks = [1, 10, 100, 1e3, 1e4, 1e5];
+  const yTicks = [1e-10, 1e-7, 1e-4, 1e-1];
+
+  g.append('g').attr('class', 'grid').selectAll('line.gx').data(xTicks).enter().append('line')
+    .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', ih);
+  g.append('g').attr('class', 'grid').selectAll('line.gy').data(yTicks).enter().append('line')
+    .attr('x1', 0).attr('x2', iw).attr('y1', d => y(d)).attr('y2', d => y(d));
+  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
+  xTicks.forEach(t => {
+    g.append('line').attr('x1', x(t)).attr('x2', x(t)).attr('y1', ih).attr('y2', ih + 4).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', x(t)).attr('y', ih + 16).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(t));
+  });
+  yTicks.forEach(v => {
+    g.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', -8).attr('y', y(v) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(expSup(v));
+  });
+  g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 30)
+    .attr('text-anchor', 'middle').text('t');
+  g.append('text').attr('class', 'axis-label').attr('transform', `translate(-44,${ih/2}) rotate(-90)`)
+    .attr('text-anchor', 'middle').text('moment');
+
+  const colors = ['#4c2db3', '#c8632b', '#2e7a48', '#9a4419'];
+  const labels = ['s = s⁽¹⁾', 's⁽²⁾', 's⁽³⁾', 's⁽⁴⁾'];
+  const legend = g.append('g').attr('transform', `translate(${iw + 12}, 20)`);
+  labels.forEach((lab, i) => {
+    const ry = i * 18;
+    legend.append('line').attr('x1', 0).attr('x2', 18).attr('y1', ry).attr('y2', ry)
+      .attr('stroke', colors[i]).attr('stroke-width', 2.4);
+    legend.append('text').attr('x', 24).attr('y', ry + 4).attr('class', 'curve-label').attr('fill', colors[i]).text(lab);
+  });
+
+  const closureClipId = 'closure-clip-' + Math.floor(Math.random() * 1e6);
+  g.append('defs').append('clipPath').attr('id', closureClipId)
+    .append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih);
+  const liveG = g.append('g').attr('clip-path', `url(#${closureClipId})`);
+  const lineGen = d3.line()
+    .defined(d => d.t >= 1 && d.v > 1e-10)
+    .x(d => x(d.t)).y(d => y(Math.max(d.v, 1e-10)))
+    .curve(d3.curveMonotoneX);
+
+  function update(aVal) {
+    const sim = simulate({ a: aVal, withSnapshots: true });
+    liveG.selectAll('*').remove();
+    for (let k = 1; k <= 4; k++) {
+      const pts = [];
+      for (let idx = 0; idx < sim.t.length; idx++) {
+        const w = sim.snap[idx];
+        let mom = 0;
+        for (let i = 0; i < D; i++) {
+          const lk = Math.pow(sim.lam[i], k);
+          mom += lk * w[i] * w[i];
+        }
+        pts.push({ t: sim.t[idx], v: mom });
+      }
+      liveG.append('path').attr('d', lineGen(pts))
+        .attr('stroke', colors[k-1]).attr('stroke-width', 2).attr('fill', 'none');
+    }
+  }
+
+  return { update };
+}
+
+function renderClosure(root) {
+  const plot = makeClosurePlot(root.querySelector('svg.closure'));
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
   function update(aVal) {
@@ -2203,6 +2318,7 @@ renderUS(document.getElementById('us-traj'));
 renderTimeSeries(document.getElementById('time-series'));
 renderTail(document.getElementById('tail'));
 renderTradeoff(document.getElementById('tradeoff'));
+renderClosure(document.getElementById('closure-widget'));
 makeDashboard(document.getElementById('dash'));
 </script>
 </body>
