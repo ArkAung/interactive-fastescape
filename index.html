@@ -31,6 +31,7 @@
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 html, body { background: var(--bg); color: var(--ink); }
 body {
   margin: 0;
@@ -163,6 +164,31 @@ aside.legend dl { margin: 0.4rem 0 0; display: grid; grid-template-columns: max-
 aside.legend dt { font-family: var(--mono); font-size: 0.82rem; color: var(--primary); padding-top: 2px; }
 aside.legend dd { margin: 0; }
 
+nav.toc {
+  margin: 2rem 0 3.2rem;
+  padding: 1.1rem 1.3rem 1.1rem 1.5rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-size: 0.92rem;
+}
+nav.toc .toc-title {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
+}
+nav.toc ol {
+  margin: 0;
+  padding-left: 1.4rem;
+  line-height: 1.7;
+}
+nav.toc li::marker { color: var(--muted); font-family: var(--mono); font-size: 0.85em; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dashed var(--rule); }
+nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
+
 .intro { margin: 0 0 3.5rem; }
 .intro p { margin: 0 0 1.05rem; }
 .intro p:first-child { font-size: 1.18rem; line-height: 1.55; }
@@ -185,8 +211,24 @@ aside.legend dd { margin: 0; }
 
       <p>Here&rsquo;s the setup. There is some unknown direction w<sup>&star;</sup> hiding in a high-dimensional space, and your job is to find it. You don&rsquo;t get to look at it. What you get to do is fire random vectors x at it and observe y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, plus a little noise. That squaring is the whole reason the problem is interesting. It throws away the sign of w<sup>&star;</sup>: flipping the answer to &minus;w<sup>&star;</sup> gives back exactly the same observations, so the loss ends up with two equally valid minima and a path between them that is anything but trivial.</p>
 
-      <p>One single knob, <em>a</em>, controls everything. It says how the input variance is spread across directions. At <em>a</em> = 0 every direction has the same variance and the data is a uniform fuzzy ball. As <em>a</em> grows, more and more of the variance gets squeezed into a few dominant directions, until at large <em>a</em> the data is basically a thin needle along one axis. The five training runs in &sect;0 differ only in this one knob, and as you&rsquo;ll see, that&rsquo;s enough to change the learning curve completely. The rest of the page is a walk through why: the loss landscape (&sect;1), the two summary numbers that describe a trajectory (&sect;2), the three phases of training (&sect;3), the slow spectral tail (&sect;4), and finally the trade-off (&sect;5) that resolves the &sect;0 puzzle.</p>
+      <p>One single knob, <em>a</em>, controls everything. It says how the input variance is spread across directions. At <em>a</em> = 0 every direction has the same variance and the data is a uniform fuzzy ball. As <em>a</em> grows, more and more of the variance gets squeezed into a few dominant directions, until at large <em>a</em> the data is basically a thin needle along one axis. The five training runs in &sect;0 differ only in this one knob, and as you&rsquo;ll see, that&rsquo;s enough to change the learning curve completely.</p>
     </div>
+
+    <nav class="toc">
+      <p class="toc-title">Sections</p>
+      <ol>
+        <li><a href="#s0">Five training runs</a></li>
+        <li><a href="#play">Try it yourself</a></li>
+        <li><a href="#s1">What gradient flow has to climb</a></li>
+        <li><a href="#s2">Two numbers, not d</a></li>
+        <li><a href="#s3">Three phases of training</a></li>
+        <li><a href="#s4">The spectral tail</a></li>
+        <li><a href="#s5">The trade-off, in one picture</a></li>
+        <li><a href="#closure">Behind the math</a></li>
+        <li><a href="#dashboard">The whole picture, all at once</a></li>
+        <li><a href="#s7">Why this matters</a></li>
+      </ol>
+    </nav>
 
     <section id="s0">
       <h2><span class="num">&sect;0</span>Five training runs</h2>
