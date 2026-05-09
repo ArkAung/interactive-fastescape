@@ -321,7 +321,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
     <section id="s0">
       <h2><span class="num">&sect;0</span>Five training runs</h2>
-      <p class="lede">Five training runs on the same problem. The five plots below were all produced by the same gradient flow on the same loss with the same amount of noise. The only thing that changes between them is one parameter, <em>a</em>, and yet the curves come out wildly different. Working out why is what the rest of this page is about.</p>
+      <p class="lede">Five training runs on the same problem. The five curves on the bottom plot below were all produced by the same gradient flow on the same loss with the same amount of noise. The only thing that changes between them is one parameter, <em>a</em>, and yet the curves come out wildly different. Working out why is what the rest of this page is about.</p>
 
       <p>So what is <em>a</em> doing? Picture the training inputs as a cloud of points scattered through a high-dimensional space. The knob <em>a</em> controls how that cloud is shaped. At <em>a</em> = 0 it is a uniform fuzzy ball, with every direction having the same spread. Turn <em>a</em> up and the cloud starts getting stretched along one axis and squashed along the rest, until at large <em>a</em> almost all of the variation in the data lives in just a handful of dominant directions.</p>
 
@@ -386,7 +386,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     </section>
 
     <aside class="legend">
-      <p><strong>Cast of characters used throughout this page.</strong> Plots use the short symbols on the right; the prose uses the words on the left.</p>
+      <p><strong>Cast of characters used throughout this page.</strong> The symbol on the left is what appears on plot axes; the description on the right is what the prose calls it.</p>
       <dl>
         <dt>w<sup>&star;</sup></dt><dd><strong>The signal</strong> (paper: target weights). The unknown vector training is trying to recover.</dd>
         <dt>w</dt><dd>The current guess. What gradient flow updates over time.</dd>
@@ -469,7 +469,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
       </figure>
 
       <ol>
-        <li><strong>Phase I: escape from the saddle.</strong> Alignment crawls upward from a tiny initial value (random init gives you roughly 1/&radic;d, where d is the number of dimensions). The dot in &sect;2 was lingering near (0, 1/3) during this entire stretch, so on this plot the alignment line looks flat while the size line just drifts up to about 1/3 and stalls there.</li>
+        <li><strong>Phase I: escape from the saddle.</strong> Alignment crawls upward from a tiny initial value (random init gives you roughly 1/&radic;d, where d is the number of dimensions). The dot in &sect;2 spends this stretch creeping up the s-axis toward the saddle at (0, 1/3); on this plot the alignment line looks essentially flat while the size line drifts up to about 1/3 and stalls there.</li>
         <li><strong>Phase II: rapid convergence.</strong> Once alignment finally escapes, both summary numbers sprint toward one in lockstep, and the MSE drops fast right along with them.</li>
         <li><strong>Phase III: the spectral tail.</strong> Alignment and size are both pinned at one (the &sect;2 dot is now sitting right on top of the star), and as far as the two summary numbers are concerned, training is finished. But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude longer. Clearly something is still happening that those two summary numbers can&rsquo;t see.</li>
       </ol>
@@ -549,7 +549,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     <section id="dashboard">
       <h2><span class="num">&sect;6</span>The whole picture, all at once</h2>
 
-      <p class="lede">After seeing each aspect of the trajectory in its own section, here they all are synchronised. The top slider sets the spectrum exponent <em>a</em>; the bottom one sets the current moment in training. Drag the time slider, and the dot in the (u, s) plane walks along the path while vertical lines on the time-series plots track the same moment. Drag <em>a</em>, and the whole thing reshapes.</p>
+      <p class="lede">After seeing each aspect of the trajectory in its own section, here they all are synchronised. The top slider sets the spectrum exponent <em>a</em>; the bottom one sets the current moment in training. Drag the time slider, and the dot in the (u, s) plane walks along the path while a vertical line on the time-series panel tracks the same moment. Drag <em>a</em>, and the whole thing reshapes.</p>
 
       <figure class="widget" id="dash">
         <div class="dash-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px;">
