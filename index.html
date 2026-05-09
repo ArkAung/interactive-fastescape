@@ -2239,6 +2239,9 @@ function makeLossPlot(svgEl) {
     // origin: white-filled dot for max
     markersG.append('circle').attr('cx', sx(0)).attr('cy', sy(0))
       .attr('r', 4.5).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+    markersG.append('text').attr('x', sx(0) + 8).attr('y', sy(0) - 6)
+      .attr('font-family', 'var(--mono)').attr('font-size', 11).attr('fill', '#1a1a1f')
+      .text('origin (max)');
 
     // ±w*: stars
     const star = d3.symbol().type(d3.symbolStar).size(110)();
@@ -2253,8 +2256,6 @@ function makeLossPlot(svgEl) {
     });
 
     // Saddles: solve u = 0 and s = sStar/3
-    // u = lam1 w1 ws[0] + lam2 w2 ws[1] = 0  =>  w1 = -(lam2 ws[1])/(lam1 ws[0]) * w2  (call slope m)
-    // Substitute into s = lam1 w1^2 + lam2 w2^2 = sStar/3
     const m = -(lam2 * ws[1]) / (lam1 * ws[0]);
     const sTarget = sStar / 3;
     const denom = lam1 * m * m + lam2;
@@ -2262,12 +2263,17 @@ function makeLossPlot(svgEl) {
       const w2sq = sTarget / denom;
       if (w2sq > 0) {
         const w2 = Math.sqrt(w2sq);
-        [+1, -1].forEach(sign => {
+        [+1, -1].forEach((sign, idx) => {
           const sw2 = sign * w2;
           const sw1 = m * sw2;
           if (sw1 >= wMin && sw1 <= wMax && sw2 >= wMin && sw2 <= wMax) {
             markersG.append('circle').attr('cx', sx(sw1)).attr('cy', sy(sw2))
               .attr('r', 3.5).attr('fill', 'none').attr('stroke', '#1a1a1f').attr('stroke-width', 1.4);
+            if (idx === 0) {
+              markersG.append('text').attr('x', sx(sw1) + 8).attr('y', sy(sw2) + 4)
+                .attr('font-family', 'var(--mono)').attr('font-size', 11).attr('fill', '#1a1a1f')
+                .text('saddle');
+            }
           }
         });
       }
