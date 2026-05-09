@@ -432,7 +432,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <p>Unless something special collapses the cascade. And in the isotropic case, something does: when all eigenvalues are equal, every higher moment is just the first one rescaled, so the whole tower collapses into a 2D ODE in (u, s). For anisotropic data the eigenvalues differ, the moments are independent, and the dynamics genuinely live in an infinite-dimensional space. The paper&rsquo;s machinery (Duhamel&rsquo;s formula, Volterra integral equations, phase-by-phase approximations) is the technology built to handle that.</p>
 
-      <p>You can see the closure break by plotting the moments s, s<sup>(2)</sup>, s<sup>(3)</sup>, s<sup>(4)</sup> over time. At <em>a</em> = 0 they&rsquo;re parallel lines on log-y (same shape, different vertical offsets), so knowing one tells you all the others. As <em>a</em> grows the lines bend into different shapes, each one carrying genuinely new information.</p>
+      <p>You can see the closure break by plotting the moments s, s<sup>(2)</sup>, s<sup>(3)</sup>, s<sup>(4)</sup> over time, each divided by its own initial value (so they all start at 1). At <em>a</em> = 0 the four curves overlap exactly: knowing how one of them grows tells you how all the others grow. As <em>a</em> grows the curves peel apart, with each higher moment evolving on its own schedule.</p>
 
       <figure class="widget" id="closure-widget">
         <div class="panel-label">moments s<sup>(k)</sup>(t) = &sum; &lambda;<sub>i</sub><sup>k</sup> w<sub>i</sub><sup>2</sup>(t) for k = 1..4</div>
@@ -443,7 +443,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         </div>
       </figure>
 
-      <p>Slide <em>a</em> from 0 upward. At <em>a</em> = 0 all four curves are parallel on log-y, so the closure holds. By <em>a</em> = 1 the curves are clearly diverging in shape. By <em>a</em> = 2 they look like four genuinely different stories. That divergence is the entire reason this paper is hard.</p>
+      <p>Slide <em>a</em> from 0 upward. At <em>a</em> = 0 all four curves lie on top of each other and the closure holds. By <em>a</em> = 1 they&rsquo;re clearly peeling apart, and by <em>a</em> = 2 they look like four genuinely different stories. That divergence is the whole reason this paper is hard.</p>
     </section>
 
     <section id="dashboard">
@@ -1473,9 +1473,9 @@ function makeClosurePlot(svgEl) {
   const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
   const x = d3.scaleLog().domain([1, 1e5]).range([0, iw]);
-  const y = d3.scaleLog().domain([1e-10, 5]).range([ih, 0]);
+  const y = d3.scaleLog().domain([1, 1e10]).range([ih, 0]);
   const xTicks = [1, 10, 100, 1e3, 1e4, 1e5];
-  const yTicks = [1e-10, 1e-7, 1e-4, 1e-1];
+  const yTicks = [1, 100, 1e4, 1e6, 1e8, 1e10];
 
   g.append('g').attr('class', 'grid').selectAll('line.gx').data(xTicks).enter().append('line')
     .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', ih);
@@ -1496,7 +1496,7 @@ function makeClosurePlot(svgEl) {
   g.append('text').attr('class', 'axis-label').attr('x', iw / 2).attr('y', ih + 30)
     .attr('text-anchor', 'middle').text('t');
   g.append('text').attr('class', 'axis-label').attr('transform', `translate(-44,${ih/2}) rotate(-90)`)
-    .attr('text-anchor', 'middle').text('moment');
+    .attr('text-anchor', 'middle').text('moment / initial');
 
   const colors = ['#4c2db3', '#c8632b', '#2e7a48', '#9a4419'];
   const labels = ['s = s⁽¹⁾', 's⁽²⁾', 's⁽³⁾', 's⁽⁴⁾'];
@@ -1513,14 +1513,22 @@ function makeClosurePlot(svgEl) {
     .append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih);
   const liveG = g.append('g').attr('clip-path', `url(#${closureClipId})`);
   const lineGen = d3.line()
-    .defined(d => d.t >= 1 && d.v > 1e-10)
-    .x(d => x(d.t)).y(d => y(Math.max(d.v, 1e-10)))
+    .defined(d => d.t >= 1 && d.v > 0)
+    .x(d => x(d.t)).y(d => y(Math.max(d.v, 1)))
     .curve(d3.curveMonotoneX);
 
   function update(aVal) {
     const sim = simulate({ a: aVal, withSnapshots: true });
     liveG.selectAll('*').remove();
     for (let k = 1; k <= 4; k++) {
+      // Compute moment at first sample to use as a normaliser
+      const w0 = sim.snap[0];
+      let mom0 = 0;
+      for (let i = 0; i < D; i++) {
+        const lk = Math.pow(sim.lam[i], k);
+        mom0 += lk * w0[i] * w0[i];
+      }
+      const norm = mom0 > 0 ? mom0 : 1;
       const pts = [];
       for (let idx = 0; idx < sim.t.length; idx++) {
         const w = sim.snap[idx];
@@ -1529,7 +1537,7 @@ function makeClosurePlot(svgEl) {
           const lk = Math.pow(sim.lam[i], k);
           mom += lk * w[i] * w[i];
         }
-        pts.push({ t: sim.t[idx], v: mom });
+        pts.push({ t: sim.t[idx], v: mom / norm });
       }
       liveG.append('path').attr('d', lineGen(pts))
         .attr('stroke', colors[k-1]).attr('stroke-width', 2).attr('fill', 'none');
