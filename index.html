@@ -291,7 +291,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <p>For linear models we know the answer pretty well by now. It comes down to the <em>spectrum</em> of the data&rsquo;s covariance, which is basically a list of how much variance the data carries in each principal direction. That spectrum sets the rate at which the loss falls, and the curve drops out. For nonlinear models the story has been mostly empirical: people fit power laws and notice regularities, but proper derivations have been hard to come by. This page is a walkthrough of a recent paper that nails down a scaling law in the cleanest nonlinear setting we&rsquo;ve got, a problem called <strong>phase retrieval</strong>.</p>
 
-      <p>Here&rsquo;s the setup. There is some unknown direction w<sup>&star;</sup> hiding in a high-dimensional space, and your job is to find it. You don&rsquo;t get to look at it. What you get to do is fire random vectors x at it and observe y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, plus a little noise. That squaring is the whole reason the problem is interesting. It throws away the sign of w<sup>&star;</sup>: flipping the answer to &minus;w<sup>&star;</sup> gives back exactly the same observations, so the loss ends up with two equally valid minima and a path between them that is anything but trivial.</p>
+      <p>Here&rsquo;s the setup. There is some unknown signal w<sup>&star;</sup> (the paper calls it the target weights) hiding in a high-dimensional space, and your job is to find it. You don&rsquo;t get to look at it. Instead, you fire random vectors x at it and observe y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, plus a little noise. That squaring is the whole reason the problem is interesting. It throws away the sign of w<sup>&star;</sup>: flipping it to &minus;w<sup>&star;</sup> gives back exactly the same observations, so the loss ends up with two equally valid minima and a path between them that is anything but trivial.</p>
 
       <p>One single knob, <em>a</em>, controls everything. It says how the input variance is spread across directions. At <em>a</em> = 0 every direction has the same variance and the data is a uniform fuzzy ball. As <em>a</em> grows, more and more of the variance gets squeezed into a few dominant directions, until at large <em>a</em> the data is basically a thin needle along one axis. The five training runs in &sect;0 differ only in this one knob, and as you&rsquo;ll see, that&rsquo;s enough to change the learning curve completely.</p>
     </div>
@@ -350,7 +350,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     <section id="play">
       <h2>Try it yourself</h2>
 
-      <p class="lede">Before any math, the most direct way to feel phase retrieval is to play the optimiser for two minutes. The picture below is the loss for a hidden direction w<sup>&star;</sup> in two dimensions. Drag the cross. The number on the right of the figure is the loss at your current guess. See how small you can make it.</p>
+      <p class="lede">Before any math, the most direct way to feel phase retrieval is to play the optimiser for two minutes. The picture below is the loss for a hidden signal w<sup>&star;</sup> in two dimensions. Drag the cross. The number on the right of the figure is the loss at your current guess. See how small you can make it.</p>
 
       <figure class="widget" id="play-widget">
         <div class="panel-label">drag the cross anywhere; the coloured map is the loss</div>
@@ -372,19 +372,20 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         <li>Between the origin and either valley there is a saddle. If you only knew which way was downhill, and you started somewhere near the origin, you&rsquo;d have to skirt past one of those saddles before you could reach a real minimum.</li>
       </ol>
 
-      <p>Hit <strong>Reveal w<sup>&star;</sup></strong> to see where the answer was hiding the whole time. From here on, the page lets gradient flow do the dragging instead, and we start figuring out exactly why the curves in &sect;0 look the way they do.</p>
+      <p>Hit <strong>Reveal w<sup>&star;</sup></strong> to see where the signal was hiding the whole time. From here on, the page lets gradient flow do the dragging instead, and we start figuring out exactly why the curves in &sect;0 look the way they do.</p>
     </section>
 
     <aside class="legend">
       <p><strong>Cast of characters used throughout this page.</strong> Plots use the short symbols on the right; the prose uses the words on the left.</p>
       <dl>
-        <dt>w<sup>&star;</sup></dt><dd><strong>The answer.</strong> A hidden direction in many dimensions that training is trying to recover.</dd>
-        <dt>w</dt><dd><strong>The current guess.</strong> The estimate that gradient flow updates over time.</dd>
-        <dt>x</dt><dd><strong>An input sample.</strong> A random point drawn from the data cloud.</dd>
-        <dt>y</dt><dd><strong>An observation.</strong> What the model gets to see for each x. In phase retrieval, y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, which throws away the sign of the answer.</dd>
-        <dt>u</dt><dd><strong>Alignment.</strong> A single number for how well the guess points along the answer. About 0 at random init; 1 when training is done.</dd>
-        <dt>s</dt><dd><strong>Size.</strong> A single number for how big the guess is, weighted to count high-variance directions more. About 0 at init; 1 when done.</dd>
-        <dt>a</dt><dd><strong>Anisotropy.</strong> The slider knob you've been dragging. Larger <em>a</em> = more stretched data cloud.</dd>
+        <dt>w<sup>&star;</sup></dt><dd><strong>The signal</strong> (paper: target weights). The unknown vector training is trying to recover.</dd>
+        <dt>w</dt><dd>The current guess. What gradient flow updates over time.</dd>
+        <dt>x</dt><dd>An input sample, a random point drawn from the data distribution.</dd>
+        <dt>y</dt><dd>An observation, what the model gets to see for each x. In phase retrieval, y = (x &middot; w<sup>&star;</sup>)<sup>2</sup> + noise, which throws away the sign of w<sup>&star;</sup>.</dd>
+        <dt>u</dt><dd>The paper&rsquo;s overlap statistic, &lang;w, w<sup>&star;</sup>&rang;<sub>Q</sub>. We sometimes call it &ldquo;alignment&rdquo; for short. About 0 at random init; 1 when training is done.</dd>
+        <dt>s</dt><dd>The paper&rsquo;s size statistic, &lang;w, Qw&rang;. We sometimes call it &ldquo;size&rdquo; or &ldquo;energy&rdquo; for short. About 0 at init; 1 when done.</dd>
+        <dt>&lambda;<sub>i</sub></dt><dd>The i-th eigenvalue of the data covariance Q. The list of all of them is the <em>spectrum</em>. The paper takes &lambda;<sub>i</sub> &prop; i<sup>&minus;a</sup>.</dd>
+        <dt>a</dt><dd>The spectrum exponent. The slider knob you&rsquo;ve been dragging. Larger <em>a</em> means more variance is concentrated in a few dominant directions.</dd>
       </dl>
     </aside>
 
@@ -407,7 +408,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
       <p>A few things are worth pointing out about this picture:</p>
 
       <ol>
-        <li><strong>There are two valleys, not one.</strong> Both stars are equally deep, and they sit at exactly opposite directions. Phase retrieval squares an inner product, which throws away the sign of the answer, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce literally the same data. The loss has no way to tell them apart, so both valleys are equally good answers.</li>
+        <li><strong>There are two valleys, not one.</strong> Both stars are equally deep, and they sit at exactly opposite points. Phase retrieval squares an inner product, which throws away the sign of w<sup>&star;</sup>, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce literally the same data. The loss has no way to tell them apart, so both valleys are equally good solutions.</li>
         <li><strong>The origin is a hill, not a valley.</strong> A random starting guess lands somewhere near the origin (small in every coordinate). To get into one of the valleys, the ball has to skirt past one of the two saddles (the open circles sitting between the origin and the stars). That awkward detour is where the long plateau in &sect;0&rsquo;s curves comes from.</li>
         <li><strong>Sliding <em>a</em> stretches the landscape</strong> along one direction, namely the high-variance direction of the data. The two valleys, the hill, and the two saddles all stay exactly where they are; what changes are the slopes between them. So anisotropy reshapes the path the ball takes, but it doesn&rsquo;t change which valleys exist.</li>
       </ol>
@@ -420,8 +421,8 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <p>At each moment of training, those two summary numbers tell you where the guess is:</p>
       <ul>
-        <li><strong>alignment</strong>: how well the guess points along the hidden answer. It starts near zero (a random direction is essentially uncorrelated with the answer) and grows toward one as training succeeds. Plotted as <em>u</em>.</li>
-        <li><strong>size</strong>: how big the guess is, with high-variance directions counted more heavily. It starts near zero (a random unit vector has tiny weighted norm in 1000 dimensions) and grows toward one when training is done. Plotted as <em>s</em>.</li>
+        <li><strong>alignment</strong> (the paper&rsquo;s u, defined as &lang;w, w<sup>&star;</sup>&rang;<sub>Q</sub>): how well the guess aligns with w<sup>&star;</sup>. It starts near zero (a random vector in 1000 dimensions is essentially uncorrelated with w<sup>&star;</sup>) and grows toward one as training succeeds. &ldquo;Alignment&rdquo; is our shorthand label, not the paper&rsquo;s.</li>
+        <li><strong>size</strong> (the paper&rsquo;s s, defined as &lang;w, Qw&rang;): how big the guess is, with high-variance directions counted more heavily. It starts near zero and grows toward one when training is done. &ldquo;Size&rdquo; is our shorthand label, not the paper&rsquo;s.</li>
       </ul>
       <p>That is it. Those two numbers are everything the loss ever sees. So no matter how big the dimension gets, training just traces a single curve in this 2D plane.</p>
 
@@ -507,7 +508,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <p>The <strong>escape rate</strong> (green) is how quickly alignment grows from near zero, just after random initialisation. As <em>a</em> increases, the data&rsquo;s variance gets concentrated onto a single dominant direction, which means the gradient near the saddle ends up concentrated there too. Any random starting guess has at least <em>some</em> tiny component along that dominant direction, and that component grows fast. So the bigger <em>a</em> is, the faster you escape.</p>
 
-      <p>The <strong>tail rate</strong> (red-brown) is how quickly the slowest component of the answer is learned. Each component decays at a rate set by its variance in the data, and once <em>a</em> gets large the lowest-variance component has almost no variance left at all. So the slowest component decays painfully slowly, and it&rsquo;s what drags the MSE down through the entire spectral tail.</p>
+      <p>The <strong>tail rate</strong> (red-brown) is how quickly the slowest component of w<sup>&star;</sup> is learned. Each component decays at a rate set by its variance in the data, and once <em>a</em> gets large the lowest-variance component has almost no variance left at all. So the slowest component decays painfully slowly, and it&rsquo;s what drags the MSE down through the entire spectral tail.</p>
 
       <p>And that, finally, is the answer to &sect;0. Five different values of <em>a</em> land on five different points along these two curves, and out come five different learning curves.</p>
     </section>
