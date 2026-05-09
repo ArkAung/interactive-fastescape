@@ -164,6 +164,88 @@ aside.legend dl { margin: 0.4rem 0 0; display: grid; grid-template-columns: max-
 aside.legend dt { font-family: var(--mono); font-size: 0.82rem; color: var(--primary); padding-top: 2px; }
 aside.legend dd { margin: 0; }
 
+.regime-badge {
+  margin: 0.9rem 0 0;
+  padding: 0.7rem 1rem 0.75rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--regime-color, var(--primary));
+  border-radius: 2px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.regime-badge .regime-label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--regime-color, var(--primary));
+  margin: 0 0 0.25rem;
+}
+.regime-badge .regime-state {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 0.6rem;
+  padding: 0.05em 0.5em;
+  border: 1px solid var(--regime-color, var(--rule));
+  color: var(--regime-color, var(--muted));
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.02);
+}
+.regime-badge .regime-desc {
+  margin: 0.2rem 0 0;
+  color: var(--ink);
+}
+
+.cloud-state-title {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--regime-color, var(--primary));
+  background: rgba(251, 249, 243, 0.8);
+  padding: 0.2em 0.5em;
+  border: 1px solid var(--regime-color, var(--rule));
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.diag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 0.8rem;
+}
+.diag-grid .diag {
+  padding: 0.5rem 0.7rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+.diag-grid .diag-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.diag-grid .diag-value {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 0.2rem;
+  color: var(--diag-color, var(--ink));
+}
+
 nav.toc {
   margin: 2rem 0 3.2rem;
   padding: 1.1rem 1.3rem 1.1rem 1.5rem;
@@ -244,7 +326,9 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
           </div>
           <div>
             <div class="panel-label">data cloud (drag to rotate)</div>
-            <div class="cloud3d" style="aspect-ratio: 1; width: 100%; background: #fbf9f3; border: 1px solid var(--rule);"></div>
+            <div class="cloud3d" style="aspect-ratio: 1; width: 100%; background: #fbf9f3; border: 1px solid var(--rule); position: relative;">
+              <div class="cloud-state-title">Isotropic sphere</div>
+            </div>
           </div>
         </div>
         <div class="panel-label">learning curve, MSE(t)</div>
@@ -252,6 +336,11 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         <div class="controls">
           <label>a = <span class="readout">1.00</span></label>
           <input type="range" min="0" max="2" step="0.05" value="1.0">
+        </div>
+        <div class="regime-badge" data-regime>
+          <span class="regime-label">Transitional</span>
+          <span class="regime-state">Active escape</span>
+          <p class="regime-desc">A handful of directions carry most of the variance. Escape kicks in, but the long tail is starting to drag.</p>
         </div>
       </figure>
 
@@ -383,12 +472,11 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
       <p class="lede">By the time those two summary numbers reach one, the guess has the right alignment and the right size <em>on average</em>. But the guess is really a vector with one entry per dimension, and on a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error of every single coordinate at five different points in training:</p>
 
       <figure class="widget" id="tail">
-        <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times, plus an animated sweep</div>
+        <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times</div>
         <svg class="tail" viewBox="0 0 720 380"></svg>
         <div class="controls">
           <label>a = <span class="readout">1.00</span></label>
           <input type="range" min="0" max="2" step="0.05" value="1.0">
-          <button class="play-btn" style="font-family: var(--mono); font-size: 0.78rem; padding: 0.4rem 0.8rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; cursor: pointer;">&#9654; play sweep</button>
         </div>
       </figure>
 
@@ -472,6 +560,25 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         <div class="controls">
           <label>time t = <span class="readout-t">10²</span></label>
           <input type="range" class="slider-t" min="0" max="5" step="0.02" value="2">
+        </div>
+        <div class="regime-badge" data-regime>
+          <span class="regime-label">Transitional</span>
+          <span class="regime-state">Active escape</span>
+          <p class="regime-desc">A handful of directions carry most of the variance. Escape kicks in, but the long tail is starting to drag.</p>
+        </div>
+        <div class="diag-grid">
+          <div class="diag" data-diag="escape">
+            <div class="diag-label">Escape phase</div>
+            <div class="diag-value">delayed</div>
+          </div>
+          <div class="diag" data-diag="tail">
+            <div class="diag-label">Tail decay</div>
+            <div class="diag-value">fast</div>
+          </div>
+          <div class="diag" data-diag="shape">
+            <div class="diag-label">Data shape</div>
+            <div class="diag-value">sphere</div>
+          </div>
         </div>
       </figure>
 
@@ -636,6 +743,82 @@ function logAxis(g, scale, side, ticks, tickFormatter = expSup) {
     }
   });
   return ax;
+}
+
+// Regime classifier: maps slider a to a named regime + colour + description.
+function classifyRegime(a) {
+  if (a < 0.4) {
+    return {
+      key: 'iso',
+      label: 'Near-isotropic',
+      state: 'Mediocrity plateau',
+      shape: 'isotropic sphere',
+      escape: 'delayed',
+      tail: 'fast',
+      color: '#3a6ba0',
+      desc: 'Every direction carries roughly the same variance, so there is no single useful direction to escape along. Random initialisation gets stuck near the saddle for a long time.'
+    };
+  }
+  if (a < 1.2) {
+    return {
+      key: 'mid',
+      label: 'Transitional',
+      state: 'Active escape',
+      shape: 'anisotropic disk',
+      escape: 'kicking in',
+      tail: 'moderate',
+      color: '#6a4eb8',
+      desc: 'A handful of dominant directions provide a useful escape vector, so the early plateau is shorter. The smallest-variance directions are already starting to drag the tail of the MSE.'
+    };
+  }
+  return {
+    key: 'tail',
+    label: 'Strongly anisotropic',
+    state: 'Tail-bottlenecked',
+    shape: 'spectral needle',
+    escape: 'fast',
+    tail: 'slow',
+    color: '#a85e30',
+    desc: 'Variance is concentrated into a few dominant directions. Escape from the saddle happens quickly, but the long tail of nearly-zero-variance coordinates is barely learned even at very late times.'
+  };
+}
+
+function applyRegime(badgeEl, a) {
+  if (!badgeEl) return;
+  const r = classifyRegime(a);
+  badgeEl.style.setProperty('--regime-color', r.color);
+  const lab = badgeEl.querySelector('.regime-label');
+  const st = badgeEl.querySelector('.regime-state');
+  const ds = badgeEl.querySelector('.regime-desc');
+  if (lab) lab.textContent = r.label;
+  if (st) st.textContent = r.state;
+  if (ds) ds.textContent = r.desc;
+  return r;
+}
+
+function applyDiagnostics(root, a) {
+  const r = classifyRegime(a);
+  const diags = {
+    escape: r.escape,
+    tail: r.tail,
+    shape: r.shape
+  };
+  root.querySelectorAll('.diag').forEach(d => {
+    const key = d.dataset.diag;
+    const v = d.querySelector('.diag-value');
+    if (v && diags[key]) {
+      v.textContent = diags[key];
+      v.style.setProperty('--diag-color', r.color);
+    }
+  });
+}
+
+function applyCloudTitle(cloudEl, a) {
+  const titleEl = cloudEl.querySelector('.cloud-state-title');
+  if (!titleEl) return;
+  const r = classifyRegime(a);
+  titleEl.textContent = r.shape;
+  titleEl.style.setProperty('--regime-color', r.color);
 }
 
 // Eigenvalues lambda_i propto i^{-a}, normalised so sum = 1.
@@ -1732,6 +1915,8 @@ function makeDashboard(root) {
 
   function update_a(aVal) {
     aReadout.textContent = aVal.toFixed(2);
+    applyRegime(root.querySelector('[data-regime]'), aVal);
+    applyDiagnostics(root, aVal);
     currentSim = simulate({ a: aVal, withSnapshots: true });
     // Determine global sign from final snapshot
     const last = currentSim.snap[currentSim.snap.length - 1];
@@ -2405,16 +2590,20 @@ function renderLoss(root) {
 function renderHook(root) {
   const mse = makeMSEPlot(root.querySelector('svg.mse'));
   const spec = makeSpectrumPlot(root.querySelector('svg.spec'));
-  const cloud = makeCloud3D(root.querySelector('.cloud3d'));
+  const cloud3dEl = root.querySelector('.cloud3d');
+  const cloud = makeCloud3D(cloud3dEl);
 
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
+  const regimeBadge = root.querySelector('[data-regime]');
 
   function update(aVal) {
     readout.textContent = aVal.toFixed(2);
     spec.update(aVal);
     cloud.update(aVal);
     mse.update(aVal);
+    applyRegime(regimeBadge, aVal);
+    applyCloudTitle(cloud3dEl, aVal);
   }
 
   slider.addEventListener('input', e => update(parseFloat(e.target.value)));
