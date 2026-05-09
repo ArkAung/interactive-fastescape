@@ -1686,10 +1686,12 @@ function makeUSPlot(svgEl) {
 
     liveG.append('path').attr('d', lineGen(pts))
       .attr('stroke', '#1a1a1f').attr('stroke-width', 2.4).attr('fill', 'none');
-    const dot = liveG.append('circle').attr('r', 5)
-      .attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+    liveG.append('circle').attr('cx', x(pts[0].u)).attr('cy', y(pts[0].s))
+      .attr('r', 6).attr('fill', '#1a1a1f').attr('stroke', '#fff').attr('stroke-width', 2);
+    const dot = liveG.append('circle').attr('r', 6)
+      .attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 2);
     let i = 0;
-    const stepPerFrame = Math.max(1, Math.ceil(pts.length / 120));
+    const stepPerFrame = Math.max(1, Math.ceil(pts.length / 240));
     function step() {
       i = Math.min(i + stepPerFrame, pts.length - 1);
       dot.attr('cx', x(pts[i].u)).attr('cy', y(pts[i].s));
@@ -2293,30 +2295,52 @@ function makeLossSurface3D(container) {
   buildSurface();
 
   // Trajectory
-  let trajLine = null, trajDot = null, trajRAF = null;
+  let trajLine = null, trajDot = null, trajStart = null, trajRAF = null;
+
+  function disposeMesh(m) {
+    if (!m) return;
+    scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) m.material.dispose();
+  }
 
   function showTrajectory(path) {
-    if (trajLine) { scene.remove(trajLine); trajLine.geometry.dispose(); trajLine.material.dispose(); trajLine = null; }
-    if (trajDot)  { scene.remove(trajDot);  trajDot.geometry.dispose();  trajDot.material.dispose();  trajDot = null; }
+    disposeMesh(trajLine); trajLine = null;
+    disposeMesh(trajDot);  trajDot  = null;
+    disposeMesh(trajStart); trajStart = null;
     if (trajRAF) { cancelAnimationFrame(trajRAF); trajRAF = null; }
 
     const pts3 = path.map(([w1, w2]) => {
       const L = computeL(w1, w2);
-      const y = (L - lminCache) * heightScaleCache + 0.04;
+      const y = (L - lminCache) * heightScaleCache + 0.05;
       return new THREE.Vector3(w1, y, w2);
     });
-    const lineGeom = new THREE.BufferGeometry().setFromPoints(pts3);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x1a1a1f });
-    trajLine = new THREE.Line(lineGeom, lineMat);
-    scene.add(trajLine);
 
-    const dotGeom = new THREE.SphereGeometry(0.05, 18, 18);
-    const dotMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1f });
+    // Trajectory as a tube so it has actual thickness on screen (LineBasicMaterial caps at 1px in WebGL).
+    if (pts3.length >= 2) {
+      const curve = new THREE.CatmullRomCurve3(pts3);
+      const tubeGeom = new THREE.TubeGeometry(curve, Math.max(40, pts3.length * 2), 0.022, 8, false);
+      const tubeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+      trajLine = new THREE.Mesh(tubeGeom, tubeMat);
+      scene.add(trajLine);
+    }
+
+    // Start marker: a black sphere at the click point, matching the 2D top-down style.
+    const startGeom = new THREE.SphereGeometry(0.075, 20, 20);
+    const startMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1f });
+    trajStart = new THREE.Mesh(startGeom, startMat);
+    trajStart.position.copy(pts3[0]);
+    scene.add(trajStart);
+
+    // Moving dot: white sphere, matches the 2D moving dot.
+    const dotGeom = new THREE.SphereGeometry(0.075, 20, 20);
+    const dotMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
     trajDot = new THREE.Mesh(dotGeom, dotMat);
+    trajDot.position.copy(pts3[0]);
     scene.add(trajDot);
 
     let i = 0;
-    const stepPerFrame = Math.max(1, Math.ceil(pts3.length / 120));
+    const stepPerFrame = Math.max(1, Math.ceil(pts3.length / 240)); // ~4s at 60fps
     function step() {
       i = Math.min(i + stepPerFrame, pts3.length - 1);
       trajDot.position.copy(pts3[i]);
@@ -2366,8 +2390,9 @@ function makeLossSurface3D(container) {
     lam2 = lam2Raw / lamSum;
     sStar = lam1 * ws[0] * ws[0] + lam2 * ws[1] * ws[1];
     buildSurface();
-    if (trajLine) { scene.remove(trajLine); trajLine = null; }
-    if (trajDot)  { scene.remove(trajDot); trajDot = null; }
+    disposeMesh(trajLine); trajLine = null;
+    disposeMesh(trajDot);  trajDot  = null;
+    disposeMesh(trajStart); trajStart = null;
     if (trajRAF)  { cancelAnimationFrame(trajRAF); trajRAF = null; }
   }
 
@@ -2464,10 +2489,10 @@ function makeLossPlot(svgEl) {
       .attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
       .attr('opacity', 0.95);
     const startDot = trajG.append('circle').attr('cx', sx(path[0][0])).attr('cy', sy(path[0][1]))
-      .attr('r', 4).attr('fill', '#1a1a1f').attr('stroke', '#fff').attr('stroke-width', 1.5);
-    const dot = trajG.append('circle').attr('r', 5).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 1.5);
+      .attr('r', 6).attr('fill', '#1a1a1f').attr('stroke', '#fff').attr('stroke-width', 2);
+    const dot = trajG.append('circle').attr('r', 6).attr('fill', '#fff').attr('stroke', '#1a1a1f').attr('stroke-width', 2);
     let i = 0;
-    const stepPerFrame = Math.max(1, Math.ceil(path.length / 120));
+    const stepPerFrame = Math.max(1, Math.ceil(path.length / 240));
     function step() {
       i = Math.min(i + stepPerFrame, path.length - 1);
       pathEl.attr('d', lineGen(path.slice(0, i + 1)));
