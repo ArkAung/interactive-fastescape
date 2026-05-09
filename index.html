@@ -383,11 +383,12 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
       <p class="lede">By the time those two summary numbers reach one, the guess has the right alignment and the right size <em>on average</em>. But the guess is really a vector with one entry per dimension, and on a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error of every single coordinate at five different points in training:</p>
 
       <figure class="widget" id="tail">
-        <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times</div>
+        <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times, plus an animated sweep</div>
         <svg class="tail" viewBox="0 0 720 380"></svg>
         <div class="controls">
           <label>a = <span class="readout">1.00</span></label>
           <input type="range" min="0" max="2" step="0.05" value="1.0">
+          <button class="play-btn" style="font-family: var(--mono); font-size: 0.78rem; padding: 0.4rem 0.8rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; cursor: pointer;">&#9654; play sweep</button>
         </div>
       </figure>
 
@@ -1128,13 +1129,20 @@ function makeTailPlot(svgEl) {
   g.append('defs').append('clipPath').attr('id', tailClipId)
     .append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih);
   const liveG = g.append('g').attr('clip-path', `url(#${tailClipId})`);
+  const sweepG = g.append('g').attr('clip-path', `url(#${tailClipId})`);
   const lineGen = d3.line()
     .x(d => x(d.i)).y(d => y(Math.max(d.e, 1e-6)))
     .defined(d => d.e > 1e-6)
     .curve(d3.curveMonotoneX);
 
+  let lastSim = null;
+  let lastSign = 1;
+  let sweepRAF = null;
+
   function update(aVal) {
     liveG.selectAll('*').remove();
+    sweepG.selectAll('*').remove();
+    if (sweepRAF) { cancelAnimationFrame(sweepRAF); sweepRAF = null; }
     const sim = simulate({ a: aVal, withSnapshots: true });
 
     // Choose global sign by comparing final w to ±w*
@@ -1145,6 +1153,7 @@ function makeTailPlot(svgEl) {
       mp += dp * dp; mn += dn * dn;
     }
     const sign = mp <= mn ? 1 : -1;
+    lastSim = sim; lastSign = sign;
 
     snapTimes.forEach((tk, k) => {
       // closest snap by log-time distance
@@ -1177,18 +1186,63 @@ function makeTailPlot(svgEl) {
     });
   }
 
-  return { update };
+  function tailPointsAtIndex(idx) {
+    const w = lastSim.snap[idx];
+    const NBINS = 60;
+    const logMin = 0, logMax = Math.log10(D);
+    const binSums = new Float64Array(NBINS), binCounts = new Float64Array(NBINS);
+    for (let i = 0; i < D; i++) {
+      const li = Math.log10(i + 1);
+      const b = Math.min(NBINS - 1, Math.max(0, Math.floor((li - logMin) / (logMax - logMin) * NBINS)));
+      const e = (w[i] - lastSign * lastSim.ws[i]) ** 2;
+      binSums[b] += e; binCounts[b] += 1;
+    }
+    const pts = [];
+    for (let b = 0; b < NBINS; b++) {
+      if (binCounts[b] === 0) continue;
+      const liMid = logMin + (logMax - logMin) * (b + 0.5) / NBINS;
+      pts.push({ i: Math.pow(10, liMid), e: binSums[b] / binCounts[b] });
+    }
+    return pts;
+  }
+
+  function playSweep() {
+    if (!lastSim) return;
+    if (sweepRAF) { cancelAnimationFrame(sweepRAF); sweepRAF = null; }
+    sweepG.selectAll('*').remove();
+    const pathEl = sweepG.append('path').attr('fill', 'none')
+      .attr('stroke', '#1a1a1f').attr('stroke-width', 2.4);
+    const labelEl = sweepG.append('text').attr('font-family', 'var(--mono)').attr('font-size', 11)
+      .attr('fill', '#1a1a1f');
+    const total = lastSim.t.length;
+    const stepPerFrame = Math.max(1, Math.ceil(total / 240));
+    let i = 0;
+    function frame() {
+      i = Math.min(i + stepPerFrame, total - 1);
+      const pts = tailPointsAtIndex(i);
+      pathEl.attr('d', lineGen(pts));
+      labelEl.attr('x', iw - 6).attr('y', 14).attr('text-anchor', 'end')
+        .text(`t = ${expSup(Math.max(1, lastSim.t[i]))}`);
+      if (i < total - 1) sweepRAF = requestAnimationFrame(frame);
+      else sweepRAF = null;
+    }
+    frame();
+  }
+
+  return { update, playSweep };
 }
 
 function renderTail(root) {
   const plot = makeTailPlot(root.querySelector('svg.tail'));
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
+  const playBtn = root.querySelector('.play-btn');
   function update(aVal) {
     readout.textContent = aVal.toFixed(2);
     plot.update(aVal);
   }
   slider.addEventListener('input', e => update(parseFloat(e.target.value)));
+  if (playBtn) playBtn.addEventListener('click', () => plot.playSweep());
   update(parseFloat(slider.value));
 }
 
