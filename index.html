@@ -1041,53 +1041,57 @@ function makeMSEPlot(svgEl) {
 // ---------- Spectrum plot ----------
 function makeSpectrumPlot(svgEl) {
   const W = 460, H = 200;
-  const M = { top: 12, right: 24, bottom: 30, left: 52 };
+  const M = { top: 12, right: 16, bottom: 30, left: 44 };
   const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const NBARS = 30;
+  const D = 1000;
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
   const g = svg.append('g').attr('transform', `translate(${M.left},${M.top})`);
 
-  const D = 1000;
-  const x = d3.scaleLog().domain([1, D]).range([0, iw]);
-  const y = d3.scaleLog().domain([1e-6, 1]).range([ih, 0]);
-  const xTicks = [1, 10, 100, 1000];
-  const yTicks = [1e-6, 1e-4, 1e-2, 1];
+  // Frame
+  g.append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih)
+    .attr('fill', 'none').attr('stroke', '#b8b1a0');
 
-  const grid = g.append('g').attr('class', 'grid');
-  grid.selectAll('line.gx').data(xTicks).enter().append('line')
-    .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', ih);
-  grid.selectAll('line.gy').data(yTicks).enter().append('line')
-    .attr('x1', 0).attr('x2', iw).attr('y1', d => y(d)).attr('y2', d => y(d));
+  const x = d3.scaleLinear().domain([0.5, NBARS + 0.5]).range([0, iw]);
+  const y = d3.scaleLinear().domain([0, 1.05]).range([ih, 0]);
 
-  logAxis(g.append('g').attr('transform', `translate(0,${ih})`), x, 'bottom', xTicks, v => v.toString());
-  logAxis(g, y, 'left', yTicks);
-
-  g.append('text').attr('class', 'axis-label')
-    .attr('x', iw / 2).attr('y', ih + 24).attr('text-anchor', 'middle').text('coordinate i');
-
-  const line = d3.line()
-    .x(d => x(d.i)).y(d => y(Math.max(d.lam, 1e-7)))
-    .curve(d3.curveMonotoneX);
-
-  function lamPoints(a) {
-    const lam = spectrum(a, D);
-    const pts = [];
-    for (let i = 0; i < D; i++) pts.push({ i: i + 1, lam: lam[i] });
-    return pts;
-  }
-
-  const refsG = g.append('g');
-  REFS.forEach(r => {
-    refsG.append('path').attr('d', line(lamPoints(r.a)))
-      .attr('stroke', r.color).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.55);
+  // x ticks at 1, 10, 20, 30
+  [1, 10, 20, 30].forEach(t => {
+    g.append('line').attr('x1', x(t)).attr('x2', x(t)).attr('y1', ih).attr('y2', ih + 4).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', x(t)).attr('y', ih + 14).attr('text-anchor', 'middle')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(t);
+  });
+  // y ticks
+  [0, 0.5, 1].forEach(v => {
+    g.append('line').attr('x1', 0).attr('x2', -4).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', '#b8b1a0');
+    g.append('text').attr('x', -8).attr('y', y(v) + 3).attr('text-anchor', 'end')
+      .attr('font-family', 'var(--mono)').attr('font-size', 10).attr('fill', '#555').text(v);
   });
 
-  const liveG = g.append('g');
+  g.append('text').attr('class', 'axis-label')
+    .attr('x', iw / 2).attr('y', ih + 24).attr('text-anchor', 'middle').text('coordinate i (top 30)');
+  g.append('text').attr('class', 'axis-label')
+    .attr('transform', `translate(-30,${ih / 2}) rotate(-90)`).attr('text-anchor', 'middle')
+    .text('λᵢ / λ₁');
+
+  const barsG = g.append('g');
+
   return {
     update(aVal) {
-      liveG.selectAll('*').remove();
-      liveG.append('path').attr('d', line(lamPoints(aVal)))
-        .attr('stroke', '#1a1a1f').attr('stroke-width', 2.2).attr('fill', 'none');
+      const lam = spectrum(aVal, D);
+      const lamMax = lam[0];
+      barsG.selectAll('*').remove();
+      const barWidth = (iw / (NBARS + 1)) * 0.78;
+      for (let i = 0; i < NBARS; i++) {
+        const v = lam[i] / lamMax;
+        const cx = x(i + 1);
+        const yTop = y(v);
+        barsG.append('rect')
+          .attr('x', cx - barWidth / 2).attr('y', yTop)
+          .attr('width', barWidth).attr('height', ih - yTop)
+          .attr('fill', '#4c2db3').attr('opacity', 0.85);
+      }
     }
   };
 }
