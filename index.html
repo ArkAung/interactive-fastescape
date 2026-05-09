@@ -323,7 +323,9 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
       <h2><span class="num">&sect;0</span>Five training runs</h2>
       <p class="lede">Five training runs on the same problem. The five plots below were all produced by the same gradient flow on the same loss with the same amount of noise. The only thing that changes between them is one parameter, <em>a</em>, and yet the curves come out wildly different. Working out why is what the rest of this page is about.</p>
 
-      <p>So what is <em>a</em> doing? Picture the training inputs as a cloud of points scattered through a high-dimensional space. The knob <em>a</em> controls how that cloud is shaped. At <em>a</em> = 0 it is a uniform fuzzy ball, with every direction having the same spread. Turn <em>a</em> up and the cloud starts getting stretched along one axis and squashed along the rest, until at large <em>a</em> almost all of the variation in the data lives in just a handful of dominant directions. The bar plot below shows the variance per axis (this is what people mean by the <em>spectrum</em> of the data), and the scatter cloud shows what real samples actually look like once the spectrum is steep enough to be visible.</p>
+      <p>So what is <em>a</em> doing? Picture the training inputs as a cloud of points scattered through a high-dimensional space. The knob <em>a</em> controls how that cloud is shaped. At <em>a</em> = 0 it is a uniform fuzzy ball, with every direction having the same spread. Turn <em>a</em> up and the cloud starts getting stretched along one axis and squashed along the rest, until at large <em>a</em> almost all of the variation in the data lives in just a handful of dominant directions.</p>
+
+      <p>The bar plot on the left shows the variance along each axis (this is what people mean by the <em>spectrum</em> of the data, normalised so the largest bar is at 1). The 3D cloud on the right shows what actual samples look like in three of the 1000 input coordinates: one with high variance, one with medium, one with low. At <em>a</em> = 0 the three coordinates have equal variance and the cloud is a sphere; as <em>a</em> grows, the high-variance axis stretches and the other two collapse, until the cloud is a thin needle.</p>
 
       <figure class="widget" id="hook">
         <div class="top-row">
@@ -332,7 +334,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
             <svg class="spec" viewBox="0 0 460 200"></svg>
           </div>
           <div>
-            <div class="panel-label">data cloud (drag to rotate)</div>
+            <div class="panel-label">data cloud (3 of the 1000 input dimensions, drag to rotate)</div>
             <div class="cloud3d" style="aspect-ratio: 1; width: 100%; background: #fbf9f3; border: 1px solid var(--rule); position: relative;">
               <div class="cloud-state-title">Isotropic sphere</div>
             </div>
@@ -843,8 +845,8 @@ function spectrum(a, D = 1000) {
 function makeCloud3D(container) {
   const N_SAMPLES = 320;
   const D = 1000;
-  const COORDS = [0, 4, 49];          // axis 1: top eigenvalue, axis 2: 5th, axis 3: 50th
-  const AXIS_LABELS = ['i = 1', 'i = 5', 'i = 50'];
+  const COORDS = [0, 4, 49];          // axes are the 1st, 5th, 50th input coordinates (decreasing variance)
+  const AXIS_LABELS = ['high var.', 'medium var.', 'low var.'];
 
   // Fixed standard normal samples (so the cloud doesn't reshuffle on slider)
   const rng = mulberry32(11);
@@ -929,9 +931,9 @@ function makeCloud3D(container) {
   geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const mat = new THREE.PointsMaterial({
     color: 0x4c2db3,
-    size: 0.045,
+    size: 0.085,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.92,
     sizeAttenuation: true
   });
   const points = new THREE.Points(geom, mat);
