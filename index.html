@@ -226,6 +226,21 @@ aside.legend dd { margin: 0; }
   pointer-events: none;
 }
 
+.surface-label {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: #1a1a1f;
+  background: rgba(251, 249, 243, 0.9);
+  padding: 0.18em 0.5em;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
 .diag-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -419,7 +434,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <ol>
         <li><strong>There are two valleys, not one.</strong> Both stars are equally deep, and they sit at exactly opposite points. Phase retrieval squares an inner product, which throws away the sign of w<sup>&star;</sup>, so +w<sup>&star;</sup> and &minus;w<sup>&star;</sup> produce literally the same data. The loss has no way to tell them apart, so both valleys are equally good solutions.</li>
-        <li><strong>The origin is a hill, not a valley.</strong> A random starting guess lands somewhere near the origin (small in every coordinate). To get into one of the valleys, the ball has to skirt past one of the two saddles (the open circles sitting between the origin and the stars). That awkward detour is where the long plateau in &sect;0&rsquo;s curves comes from.</li>
+        <li><strong>The origin is a hill, not a valley.</strong> A random starting guess lands near the origin (the dark sphere on top of the 3D surface, or the labelled dot in the 2D view). To reach a valley, the ball has to skirt past one of the two <em>saddles</em> (the orange spheres in 3D, the open circles in 2D). At each saddle there are two short guide tubes: a red one that climbs back toward the origin (loss goes <em>up</em> that way) and a green one that descends into a valley (loss goes <em>down</em>). That up-in-one-direction-and-down-in-the-other is the saddle&rsquo;s defining shape, and the awkward detour around it is where the long plateau in &sect;0&rsquo;s curves comes from.</li>
         <li><strong>Sliding <em>a</em> stretches the landscape</strong> along one direction, namely the high-variance direction of the data. The two valleys, the hill, and the two saddles all stay exactly where they are; what changes are the slopes between them. So anisotropy reshapes the path the ball takes, but it doesn&rsquo;t change which valleys exist.</li>
       </ol>
     </section>
@@ -2228,17 +2243,71 @@ function makeLossSurface3D(container) {
     const m = new THREE.MeshLambertMaterial({ color });
     return new THREE.Mesh(g, m);
   }
-  const markerOrigin = sphereMarker(0xffffff, 0.06);
+  const markerOrigin = sphereMarker(0x1a1a1f, 0.07);
   scene.add(markerOrigin);
-  const markerStars = [sphereMarker(0xffd14a, 0.08), sphereMarker(0xffd14a, 0.08)];
+  const markerStars = [sphereMarker(0xffd14a, 0.09), sphereMarker(0xffd14a, 0.09)];
   markerStars.forEach(m => scene.add(m));
-  const markerSaddles = [sphereMarker(0x9a9486, 0.05), sphereMarker(0x9a9486, 0.05)];
+  const markerSaddles = [sphereMarker(0xc8632b, 0.085), sphereMarker(0xc8632b, 0.085)];
   markerSaddles.forEach(m => scene.add(m));
+
+  // HTML labels at the critical points; they're reprojected each frame so they stay glued
+  // to the markers as the camera orbits.
+  function makeLabel(text) {
+    const el = document.createElement('div');
+    el.className = 'surface-label';
+    el.textContent = text;
+    container.appendChild(el);
+    return el;
+  }
+  const surfaceLabels = [
+    { el: makeLabel('origin (max)'), target: markerOrigin },
+    { el: makeLabel('w⋆'),           target: markerStars[0] },
+    { el: makeLabel('−w⋆'),          target: markerStars[1] },
+    { el: makeLabel('saddle'),       target: markerSaddles[0] },
+    { el: makeLabel('saddle'),       target: markerSaddles[1] }
+  ];
+
+  // Up- and down-direction guides at each saddle: thin lines along the surface that climb
+  // from the saddle toward the origin (red, "this way is up") and descend toward the
+  // nearest minimum (green, "this way is down"). These make the saddle's curvature
+  // explicit instead of relying on the reader to read the surface shape.
+  const saddleGuides = [];
+  function rebuildSaddleGuides(getMarkY) {
+    saddleGuides.forEach(disposeMesh);
+    saddleGuides.length = 0;
+    [0, 1].forEach(idx => {
+      const sad = markerSaddles[idx].position;
+      const sign = idx === 0 ? 1 : -1;
+      const segs = 14;
+      const pathToOrigin = [];
+      const pathToMin = [];
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const o = new THREE.Vector3(sad.x * (1 - t), 0, sad.z * (1 - t));
+        o.y = getMarkY(o.x, o.z) + 0.015;
+        pathToOrigin.push(o);
+        const goalX = sign * ws[0], goalZ = sign * ws[1];
+        const m = new THREE.Vector3(sad.x + (goalX - sad.x) * t, 0, sad.z + (goalZ - sad.z) * t);
+        m.y = getMarkY(m.x, m.z) + 0.015;
+        pathToMin.push(m);
+      }
+      const upGeom = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pathToOrigin), 30, 0.012, 6, false);
+      const upMat = new THREE.MeshLambertMaterial({ color: 0xc94f4f });
+      const upMesh = new THREE.Mesh(upGeom, upMat);
+      scene.add(upMesh); saddleGuides.push(upMesh);
+      const downGeom = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pathToMin), 30, 0.012, 6, false);
+      const downMat = new THREE.MeshLambertMaterial({ color: 0x2e7a48 });
+      const downMesh = new THREE.Mesh(downGeom, downMat);
+      scene.add(downMesh); saddleGuides.push(downMesh);
+    });
+  }
 
   function colorAt(t) {
     const c = d3.color(d3.interpolateViridis(t));
     return [c.r / 255, c.g / 255, c.b / 255];
   }
+
+  const markY = (w1, w2) => (computeL(w1, w2) - lminCache) * heightScaleCache + 0.05;
 
   function buildSurface() {
     const Lvals = new Float64Array(N * N);
@@ -2278,19 +2347,20 @@ function makeLossSurface3D(container) {
     lminCache = lmin;
     heightScaleCache = heightScale;
 
-    const markY = (w1, w2) => (computeL(w1, w2) - lmin) * heightScale + 0.045;
     markerOrigin.position.set(0, markY(0, 0), 0);
     markerStars[0].position.set(ws[0], markY(ws[0], ws[1]), ws[1]);
     markerStars[1].position.set(-ws[0], markY(-ws[0], -ws[1]), -ws[1]);
-    const m = -(lam2 * ws[1]) / (lam1 * ws[0]);
+    const slope = -(lam2 * ws[1]) / (lam1 * ws[0]);
     const sTarget = sStar / 3;
-    const denom = lam1 * m * m + lam2;
+    const denom = lam1 * slope * slope + lam2;
     if (denom > 0 && sTarget > 0) {
       const sw2 = Math.sqrt(sTarget / denom);
-      const sw1 = m * sw2;
+      const sw1 = slope * sw2;
       markerSaddles[0].position.set(sw1, markY(sw1, sw2), sw2);
       markerSaddles[1].position.set(-sw1, markY(-sw1, -sw2), -sw2);
     }
+
+    rebuildSaddleGuides(markY);
   }
   buildSurface();
 
@@ -2376,9 +2446,23 @@ function makeLossSurface3D(container) {
     }
   });
 
+  function projectSurfaceLabels() {
+    const cw = container.clientWidth, ch = container.clientHeight;
+    if (!cw || !ch) return;
+    surfaceLabels.forEach(({ el, target }) => {
+      const p = target.position.clone().project(camera);
+      const x = (p.x * 0.5 + 0.5) * cw;
+      const y = (1 - (p.y * 0.5 + 0.5)) * ch;
+      el.style.left = x + 'px';
+      el.style.top  = (y - 18) + 'px';
+      el.style.opacity = (p.z > 1) ? '0' : '1';
+    });
+  }
+
   function loop() {
     controls.update();
     renderer.render(scene, camera);
+    projectSurfaceLabels();
     requestAnimationFrame(loop);
   }
   loop();
