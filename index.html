@@ -495,7 +495,9 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     <section id="s4">
       <h2><span class="num">&sect;4</span>The spectral tail</h2>
 
-      <p class="lede">By the time those two summary numbers reach one, the guess has the right alignment and the right size <em>on average</em>. But the guess is really a vector with one entry per dimension, and on a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error of every single coordinate at five different points in training:</p>
+      <p class="lede">By the time those two summary numbers reach one, the guess has the right alignment and the right size <em>on average</em>. But the guess is really a vector with one entry per dimension, and on a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error per coordinate at five snapshots in time.</p>
+
+      <p>How to read the chart below: each curve is one snapshot of training, lightest for the earliest time, darkest for the latest. The x-axis is the coordinate index <em>i</em>, from 1 (largest variance in the data) on the left to 1000 (smallest variance) on the right. The y-axis is the squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup>, on a log scale. As training progresses you should see the curve drop on the left first while the right stays near the top: a "decay front" sweeping from low coordinates to high.</p>
 
       <figure class="widget" id="tail">
         <div class="panel-label">per-coordinate squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup> at five times</div>
@@ -745,8 +747,12 @@ const REFS = [
 ];
 
 function expSup(v) {
+  if (v <= 0) return String(v);
   const e = Math.round(Math.log10(v));
-  return `10${String(e).replace(/-/g, '−').split('').map(c => '⁰¹²³⁴⁵⁶⁷⁸⁹⁻'['0123456789-'.indexOf(c)]).join('')}`;
+  const sign = e < 0 ? '⁻' : '';
+  const digitMap = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+  const digits = String(Math.abs(e)).split('').map(c => digitMap[c.charCodeAt(0) - 48]).join('');
+  return `10${sign}${digits}`;
 }
 
 // Build axis with log ticks rendered as 10^k
@@ -1342,23 +1348,17 @@ function makeTailPlot(svgEl) {
   g.append('defs').append('clipPath').attr('id', tailClipId)
     .append('rect').attr('x', 0).attr('y', 0).attr('width', iw).attr('height', ih);
   const liveG = g.append('g').attr('clip-path', `url(#${tailClipId})`);
-  const sweepG = g.append('g').attr('clip-path', `url(#${tailClipId})`);
   const lineGen = d3.line()
     .x(d => x(d.i)).y(d => y(Math.max(d.e, 1e-6)))
     .defined(d => d.e > 1e-6)
     .curve(d3.curveMonotoneX);
 
-  let lastSim = null;
-  let lastSign = 1;
-  let sweepRAF = null;
-
   function update(aVal) {
     liveG.selectAll('*').remove();
-    sweepG.selectAll('*').remove();
-    if (sweepRAF) { cancelAnimationFrame(sweepRAF); sweepRAF = null; }
     const sim = simulate({ a: aVal, withSnapshots: true });
 
-    // Choose global sign by comparing final w to ±w*
+    // Choose a global sign by comparing the final w to ±w*. Phase retrieval has the
+    // ±w* symmetry, so we pick whichever side the trajectory ended up on.
     const last = sim.snap[sim.snap.length - 1];
     let mp = 0, mn = 0;
     for (let i = 0; i < D; i++) {
@@ -1366,96 +1366,59 @@ function makeTailPlot(svgEl) {
       mp += dp * dp; mn += dn * dn;
     }
     const sign = mp <= mn ? 1 : -1;
-    lastSim = sim; lastSign = sign;
+
+    // Pre-compute log10(i+1) so we don't redo it for every snapshot.
+    const logI = new Float64Array(D);
+    for (let i = 0; i < D; i++) logI[i] = Math.log10(i + 1);
 
     snapTimes.forEach((tk, k) => {
-      // closest snap by log-time distance
       let bestIdx = 0, bestDiff = Infinity;
       for (let i = 0; i < sim.t.length; i++) {
         const d = Math.abs(Math.log10(Math.max(sim.t[i], 1)) - Math.log10(tk));
         if (d < bestDiff) { bestDiff = d; bestIdx = i; }
       }
       const w = sim.snap[bestIdx];
-      const pts = [];
-      // Smooth by binning into log-i bins so the curve isn't visually noisy
-      const NBINS = 60;
+
+      // Per-coordinate squared error, smoothed with a Gaussian kernel in log-i space.
+      // Plain log-binning leaves the first few bins with a single noisy point each, which
+      // produces the saw-toothed curves you saw before the fix.
+      const errors = new Float64Array(D);
+      for (let i = 0; i < D; i++) errors[i] = (w[i] - sign * sim.ws[i]) ** 2;
+
+      const NPOINTS = 80;
       const logMin = 0, logMax = Math.log10(D);
-      const binSums = new Float64Array(NBINS), binCounts = new Float64Array(NBINS);
-      for (let i = 0; i < D; i++) {
-        const li = Math.log10(i + 1);
-        const b = Math.min(NBINS - 1, Math.max(0, Math.floor((li - logMin) / (logMax - logMin) * NBINS)));
-        const e = (w[i] - sign * sim.ws[i]) ** 2;
-        binSums[b] += e; binCounts[b] += 1;
-      }
-      for (let b = 0; b < NBINS; b++) {
-        if (binCounts[b] === 0) continue;
-        const liMid = logMin + (logMax - logMin) * (b + 0.5) / NBINS;
-        const iMid = Math.pow(10, liMid);
-        const eMean = binSums[b] / binCounts[b];
-        pts.push({ i: iMid, e: eMean });
+      const sigma = 0.18;
+      const inv2s2 = 1 / (2 * sigma * sigma);
+      const pts = [];
+      for (let p = 0; p < NPOINTS; p++) {
+        const x = logMin + (logMax - logMin) * p / (NPOINTS - 1);
+        let wsum = 0, weighted = 0;
+        for (let i = 0; i < D; i++) {
+          const dx = logI[i] - x;
+          if (Math.abs(dx) > 4 * sigma) continue;
+          const wk = Math.exp(-dx * dx * inv2s2);
+          wsum += wk;
+          weighted += wk * errors[i];
+        }
+        if (wsum > 0) pts.push({ i: Math.pow(10, x), e: weighted / wsum });
       }
       liveG.append('path').attr('d', lineGen(pts))
-        .attr('stroke', snapColors[k]).attr('stroke-width', 1.8).attr('fill', 'none').attr('opacity', 0.9);
+        .attr('stroke', snapColors[k]).attr('stroke-width', 2).attr('fill', 'none').attr('opacity', 0.95);
     });
   }
 
-  function tailPointsAtIndex(idx) {
-    const w = lastSim.snap[idx];
-    const NBINS = 60;
-    const logMin = 0, logMax = Math.log10(D);
-    const binSums = new Float64Array(NBINS), binCounts = new Float64Array(NBINS);
-    for (let i = 0; i < D; i++) {
-      const li = Math.log10(i + 1);
-      const b = Math.min(NBINS - 1, Math.max(0, Math.floor((li - logMin) / (logMax - logMin) * NBINS)));
-      const e = (w[i] - lastSign * lastSim.ws[i]) ** 2;
-      binSums[b] += e; binCounts[b] += 1;
-    }
-    const pts = [];
-    for (let b = 0; b < NBINS; b++) {
-      if (binCounts[b] === 0) continue;
-      const liMid = logMin + (logMax - logMin) * (b + 0.5) / NBINS;
-      pts.push({ i: Math.pow(10, liMid), e: binSums[b] / binCounts[b] });
-    }
-    return pts;
-  }
-
-  function playSweep() {
-    if (!lastSim) return;
-    if (sweepRAF) { cancelAnimationFrame(sweepRAF); sweepRAF = null; }
-    sweepG.selectAll('*').remove();
-    const pathEl = sweepG.append('path').attr('fill', 'none')
-      .attr('stroke', '#1a1a1f').attr('stroke-width', 2.4);
-    const labelEl = sweepG.append('text').attr('font-family', 'var(--mono)').attr('font-size', 11)
-      .attr('fill', '#1a1a1f');
-    const total = lastSim.t.length;
-    const stepPerFrame = Math.max(1, Math.ceil(total / 240));
-    let i = 0;
-    function frame() {
-      i = Math.min(i + stepPerFrame, total - 1);
-      const pts = tailPointsAtIndex(i);
-      pathEl.attr('d', lineGen(pts));
-      labelEl.attr('x', iw - 6).attr('y', 14).attr('text-anchor', 'end')
-        .text(`t = ${expSup(Math.max(1, lastSim.t[i]))}`);
-      if (i < total - 1) sweepRAF = requestAnimationFrame(frame);
-      else sweepRAF = null;
-    }
-    frame();
-  }
-
-  return { update, playSweep };
+  return { update };
 }
 
 function renderTail(root) {
   const plot = makeTailPlot(root.querySelector('svg.tail'));
   const slider = root.querySelector('input[type="range"]');
   const readout = root.querySelector('.readout');
-  const playBtn = root.querySelector('.play-btn');
   function update(aVal) {
     readout.textContent = aVal.toFixed(2);
     plot.update(aVal);
   }
   slider.addEventListener('input', e => update(parseFloat(e.target.value)));
-  if (playBtn) playBtn.addEventListener('click', () => plot.playSweep());
   update(parseFloat(slider.value));
 }
 
