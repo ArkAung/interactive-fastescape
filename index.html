@@ -309,13 +309,13 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
   <main id="main">
 
     <div class="intro">
-      <p>Train a model and watch its loss as it learns. Typically the curve has a recognisable shape: a long flat plateau where almost nothing happens, then a sharp drop, then a slow tail that goes on practically forever. The whole shape is what people call the <em>training dynamics</em>, and the tail in particular is well-described by a power law in training time, MSE &prop; t<sup>&minus;&gamma;</sup>, with an exponent &gamma; that depends on the data. Empirical relationships of this kind, where loss decays as a power of compute, dataset size, or model size, are what people mean by <strong>scaling laws</strong>. The big open question is what actually determines those exponents.</p>
+      <p>Train a model and watch its error as it learns. Typically the curve has a recognisable shape: a long flat plateau where almost nothing happens, then a sharp drop, then a slow tail that goes on practically forever. The whole shape is what people call the <em>training dynamics</em>. The tail is often summarized by a power law in training time, MSE &prop; t<sup>&minus;&gamma;</sup>, but in this paper the important object is more precise: a spectral average over coordinates, whose log-log behavior is controlled by the data spectrum. Empirical relationships of this kind, where error decays as a power of compute, dataset size, or model size, are what people mean by <strong>scaling laws</strong>. The big open question is what actually determines those curves.</p>
 
-      <p>For linear models we know the answer pretty well by now: the <em>spectrum</em> of the data&rsquo;s covariance (a list of how much variance the data carries in each principal direction) sets the exponent &gamma;, and the curve falls out. For nonlinear models the story has been mostly empirical: people fit power laws to training runs and notice regularities, but rigorous derivations have been hard to come by. This page is a walkthrough of a recent paper that pins down such a scaling law from first principles in the cleanest nonlinear setting we&rsquo;ve got, a problem called <strong>phase retrieval</strong>. The exponent &gamma; comes out as an explicit function of one parameter <em>a</em> that controls how spread out the data is.</p>
+      <p>For linear models we know the answer pretty well by now: the <em>spectrum</em> of the data&rsquo;s covariance (a list of how much variance the data carries in each principal direction) sets the long-time behavior, and the curve falls out. For nonlinear models the story has been mostly empirical: people fit power laws to training runs and notice regularities, but rigorous derivations have been hard to come by. This page is a walkthrough of a recent paper that derives this kind of curve from first principles in the cleanest nonlinear setting we&rsquo;ve got, a problem called <strong>phase retrieval</strong>. The key parameter is <em>a</em>, the exponent controlling how quickly the covariance eigenvalues decay.</p>
 
       <p>Here&rsquo;s the setup. There is some unknown signal w<sup>&star;</sup> (the paper calls it the target weights) hiding in a high-dimensional space, and your job is to find it. You don&rsquo;t get to look at it. Instead, you fire random vectors x at it and observe y = (x &middot; w<sup>&star;</sup>)<sup>2</sup>, plus a little noise. That squaring is the whole reason the problem is interesting. It throws away the sign of w<sup>&star;</sup>: flipping it to &minus;w<sup>&star;</sup> gives back exactly the same observations, so the loss ends up with two equally valid minima and a path between them that is anything but trivial.</p>
 
-      <p>One single knob, <em>a</em>, controls everything. It says how the input variance is spread across directions. At <em>a</em> = 0 every direction has the same variance and the data is a uniform fuzzy ball. As <em>a</em> grows, more and more of the variance gets squeezed into a few dominant directions, until at large <em>a</em> the data is basically a thin needle along one axis. The five training runs in &sect;0 differ only in this one knob, and as you&rsquo;ll see, that&rsquo;s enough to change the learning curve completely.</p>
+      <p>One single knob, <em>a</em>, controls the shape of the covariance spectrum. It says how the input variance is spread across directions. At <em>a</em> = 0 every direction has the same variance and the data is a uniform fuzzy ball. As <em>a</em> grows, more and more of the variance gets squeezed into a few dominant directions, until at large <em>a</em> the data is basically a thin needle along one axis. The paper&rsquo;s main power-law analysis is for <em>a</em> &gt; 1; this page also shows <em>a</em> = 0 and intermediate values as reference cases, so you can see exactly what anisotropy changes.</p>
     </div>
 
     <nav class="toc">
@@ -336,9 +336,9 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
     <section id="s0">
       <h2><span class="num">&sect;0</span>Five training runs</h2>
-      <p class="lede">Five training runs on the same problem. The five curves on the bottom plot below were all produced by the same gradient flow on the same loss with the same amount of noise. The only thing that changes between them is one parameter, <em>a</em>, and yet the curves come out wildly different. Working out why is what the rest of this page is about.</p>
+      <p class="lede">Five training runs with the same dimension, the same population gradient-flow equations, and the same initialization recipe. The only thing that changes between them is one parameter, <em>a</em>, which changes the covariance spectrum. That one change is enough to make the MSE curves look wildly different. Working out why is what the rest of this page is about.</p>
 
-      <p>So what is <em>a</em> doing? Picture the training inputs as a cloud of points scattered through a high-dimensional space. The knob <em>a</em> controls how that cloud is shaped. At <em>a</em> = 0 it is a uniform fuzzy ball, with every direction having the same spread. Turn <em>a</em> up and the cloud starts getting stretched along one axis and squashed along the rest, until at large <em>a</em> almost all of the variation in the data lives in just a handful of dominant directions.</p>
+      <p>So what is <em>a</em> doing? Picture the training inputs as a cloud of points scattered through a high-dimensional space. The knob <em>a</em> controls how that cloud is shaped. At <em>a</em> = 0 it is a uniform fuzzy ball, with every direction having the same spread. Turn <em>a</em> up and the cloud starts getting stretched along a few leading directions and squashed along the rest, until at large <em>a</em> almost all of the variation in the data lives in just a handful of dominant directions.</p>
 
       <p>The bar plot on the left shows the variance along each axis (this is what people mean by the <em>spectrum</em> of the data, normalised so the largest bar is at 1). The 3D cloud on the right shows what actual samples look like in three of the 1000 input coordinates: one with high variance, one with medium, one with low. At <em>a</em> = 0 the three coordinates have equal variance and the cloud is a sphere; as <em>a</em> grows, the high-variance axis stretches and the other two collapse, until the cloud is a thin needle.</p>
 
@@ -442,14 +442,14 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     <section id="s2">
       <h2><span class="num">&sect;2</span>Two numbers, not d</h2>
 
-      <p class="lede">In &sect;1 we got away with two dimensions because the landscape was drawable, but real phase retrieval has 1000 (or more), and you can&rsquo;t draw a 1000-dimensional surface. The good news is that you don&rsquo;t have to. The loss only depends on two numbers about your current guess, so however many dimensions are involved, every training run is still just a path in 2D.</p>
+      <p class="lede">In &sect;1 we got away with two dimensions because the landscape was drawable, but real phase retrieval has 1000 (or more), and you can&rsquo;t draw a 1000-dimensional surface. The first simplification is real: the population loss only depends on two numbers about your current guess. So the loss value of a high-dimensional run can still be read from a path in this 2D plane.</p>
 
       <p>At each moment of training, those two summary numbers tell you where the guess is:</p>
       <ul>
         <li><strong>alignment</strong> (the paper&rsquo;s u, defined as &lang;w, w<sup>&star;</sup>&rang;<sub>Q</sub>): how well the guess aligns with w<sup>&star;</sup>. It starts near zero (a random vector in 1000 dimensions is essentially uncorrelated with w<sup>&star;</sup>) and grows toward one as training succeeds. &ldquo;Alignment&rdquo; is our shorthand label, not the paper&rsquo;s.</li>
         <li><strong>size</strong> (the paper&rsquo;s s, defined as &lang;w, Qw&rang;): how big the guess is, with high-variance directions counted more heavily. It starts near zero and grows toward one when training is done. &ldquo;Size&rdquo; is our shorthand label, not the paper&rsquo;s.</li>
       </ul>
-      <p>That is it. Those two numbers are everything the loss ever sees. So no matter how big the dimension gets, training just traces a single curve in this 2D plane.</p>
+      <p>Those two numbers are everything the loss ever sees. That does <em>not</em> mean they contain the whole learning process: the dynamics that move them depend on higher-order moments, and the MSE depends on coordinate-by-coordinate recovery. But as far as the population loss is concerned, this 2D projection is complete.</p>
 
       <figure class="widget" id="us-traj">
         <div class="panel-label">training trajectories in (u, s), d = 1000</div>
@@ -460,9 +460,9 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         </div>
       </figure>
 
-      <p>The five faded curves are the five training runs from &sect;0, redrawn in this 2D plane. The black one is whatever <em>a</em> your slider is on. They all start near the origin (a random initial guess has tiny alignment and tiny size) and they all end at the star in the upper right, where alignment and size are both equal to one and training has converged.</p>
+      <p>The five faded curves are the five training runs from &sect;0, redrawn in this 2D plane. The black one is whatever <em>a</em> your slider is on. They all start near the origin (a random initial guess has tiny alignment and tiny size) and they all approach the star in the upper right, where alignment and size are both equal to one. At that point the loss-level summary statistics have converged, even if the MSE may still be resolving small-variance coordinates.</p>
 
-      <p>The open circle sitting at (0, 1/3) is the same saddle you met in &sect;1, just expressed in (alignment, size) coordinates instead of (w<sub>1</sub>, w<sub>2</sub>). Random init drops you near the lower-left corner, and the trajectory has to crawl up the size axis past that saddle before alignment is able to take off. That sluggish detour around the saddle is exactly the plateau you saw in &sect;0&rsquo;s curves.</p>
+      <p>The open circle sitting at (0, 1/3) is the saddle set from &sect;1, compressed into (alignment, size) coordinates. Random init drops you near the lower-left corner, where alignment is tiny. The first phase is not about already being close to the minimum; it is about escaping this low-alignment regime so the trajectory can move toward the star.</p>
 
       <p>There&rsquo;s one thing this picture is hiding from you, though: how fast the dot is actually moving along that path. That&rsquo;s what the next section gets into.</p>
     </section>
@@ -484,9 +484,9 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
       </figure>
 
       <ol>
-        <li><strong>Phase I: escape from the saddle.</strong> Alignment crawls upward from a tiny initial value (random init gives you roughly 1/&radic;d, where d is the number of dimensions). The dot in &sect;2 spends this stretch creeping up the s-axis toward the saddle at (0, 1/3); on this plot the alignment line looks essentially flat while the size line drifts up to about 1/3 and stalls there.</li>
-        <li><strong>Phase II: rapid convergence.</strong> Once alignment finally escapes, both summary numbers sprint toward one in lockstep, and the MSE drops fast right along with them.</li>
-        <li><strong>Phase III: the spectral tail.</strong> Alignment and size are both pinned at one (the &sect;2 dot is now sitting right on top of the star), and as far as the two summary numbers are concerned, training is finished. But the MSE in the bottom panel keeps falling, sometimes for orders of magnitude longer. Clearly something is still happening that those two summary numbers can&rsquo;t see.</li>
+        <li><strong>Phase I: escape from mediocrity.</strong> Alignment starts from a tiny value (random init gives you roughly 1/&radic;d, where d is the number of dimensions). On a linear plot it looks almost flat, but the paper shows that it is escaping exponentially from the low-correlation regime. The MSE barely moves because only the easiest, high-variance directions have started to align.</li>
+        <li><strong>Phase II: summary-stat convergence.</strong> Once alignment has escaped, the two summary numbers move toward one. The paper splits this into a short transition, where the energy crosses the 1/3 threshold, and a slower approach to the limit. This phase is about what the loss can see: the overlap and energy are becoming correct.</li>
+        <li><strong>Phase III: spectral-tail learning.</strong> Alignment and size are now close to one (the &sect;2 dot is sitting near the star), but the MSE in the bottom panel keeps falling, sometimes for orders of magnitude longer. The remaining error lives in low-variance coordinates, and those coordinates are learned slowly.</li>
       </ol>
 
       <p>That last point is the loose thread, and the next section pulls on it.</p>
@@ -495,7 +495,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     <section id="s4">
       <h2><span class="num">&sect;4</span>The spectral tail</h2>
 
-      <p class="lede">By the time those two summary numbers reach one, the guess has the right alignment and the right size <em>on average</em>. But the guess is really a vector with one entry per dimension, and on a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error per coordinate at five snapshots in time.</p>
+      <p class="lede">By the time those two summary numbers reach one, the guess has the right Q-weighted alignment and the right Q-weighted size. But the guess is really a vector with one entry per dimension, and the MSE cares about every entry. On a coordinate-by-coordinate level there is plenty of work left to do. To see this directly, plot the squared error per coordinate at five snapshots in time.</p>
 
       <p>How to read the chart below: each curve is one snapshot of training, lightest for the earliest time, darkest for the latest. The x-axis is the coordinate index <em>i</em>, from 1 (largest variance in the data) on the left to 1000 (smallest variance) on the right. The y-axis is the squared error (w<sub>i</sub> &minus; w<sup>&star;</sup><sub>i</sub>)<sup>2</sup>, on a log scale. As training progresses you should see the curve drop on the left first while the right stays near the top: a "decay front" sweeping from low coordinates to high.</p>
 
@@ -514,7 +514,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         <li>And here is the punchline: as you crank <em>a</em> up, the gap between the head and the tail variances grows. The head ends up learning faster <em>and</em> the tail learning slower at the same time. Two effects, one knob.</li>
       </ol>
 
-      <p>The MSE plotted in &sect;0 is just the average of these per-coordinate squared errors. The MSE plateau during Phase III is the tail being slowly chipped away one coordinate at a time, with the slowest coordinates holding the average up.</p>
+      <p>The MSE plotted in &sect;0 is just the average of these per-coordinate squared errors. The paper&rsquo;s Phase III approximation says that, once <em>u</em> and <em>s</em> are near one, each coordinate error relaxes roughly like exp(&minus;8&lambda;<sub>i</sub>t). Large-&lambda;<sub>i</sub> coordinates disappear early; tiny-&lambda;<sub>i</sub> coordinates hold the average up.</p>
 
       <p>So that&rsquo;s half of &sect;0&rsquo;s puzzle answered: <em>that&rsquo;s why the tail is slow</em>. What&rsquo;s still missing is the other half, namely why anisotropy speeds up the early escape too. That&rsquo;s the next section.</p>
     </section>
@@ -522,7 +522,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
     <section id="s5">
       <h2><span class="num">&sect;5</span>The trade-off, in one picture</h2>
 
-      <p class="lede">This is where the two halves of the story come together. The single knob <em>a</em> pushes two different rates in opposite directions: as <em>a</em> grows, the rate at which alignment escapes from the saddle goes <em>up</em>, and the rate at which the tail of the spectrum gets learned goes <em>down</em>. Same parameter, two effects, working at cross purposes.</p>
+      <p class="lede">This is where the two halves of the story come together. The single knob <em>a</em> pushes two different rates in opposite directions: as <em>a</em> grows, the rate at which alignment escapes from the low-correlation regime goes <em>up</em>, and the rate at which the tail of the spectrum gets learned goes <em>down</em>. Same parameter, two effects, working at cross purposes.</p>
 
       <figure class="widget" id="tradeoff">
         <div class="panel-label">two rates vs anisotropy <em>a</em></div>
@@ -533,11 +533,11 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         </div>
       </figure>
 
-      <p>The <strong>escape rate</strong> (green) is how quickly alignment grows from near zero, just after random initialisation. As <em>a</em> increases, the data&rsquo;s variance gets concentrated onto a single dominant direction, which means the gradient near the saddle ends up concentrated there too. Any random starting guess has at least <em>some</em> tiny component along that dominant direction, and that component grows fast. So the bigger <em>a</em> is, the faster you escape.</p>
+      <p>The <strong>escape rate</strong> (green) is how quickly alignment grows from near zero, just after random initialisation. As <em>a</em> increases, the data&rsquo;s variance gets concentrated into the leading eigendirections, so the early dynamics are dominated by those directions. A random starting guess has some tiny component there, and those components are the ones that grow first. So the bigger <em>a</em> is, the faster the run leaves the low-alignment regime.</p>
 
-      <p>The <strong>tail rate</strong> (red-brown) is how quickly the slowest component of w<sup>&star;</sup> is learned. Each component decays at a rate set by its variance in the data, and once <em>a</em> gets large the lowest-variance component has almost no variance left at all. So the slowest component decays painfully slowly, and it&rsquo;s what drags the MSE down through the entire spectral tail.</p>
+      <p>The <strong>tail rate</strong> (red-brown) is a proxy for how quickly the smallest-variance directions can be learned. In the Phase III approximation, coordinate errors decay at rates proportional to their eigenvalues. Once <em>a</em> gets large, the tail eigenvalues are tiny, so their errors decay slowly and dominate the remaining MSE.</p>
 
-      <p>And that, finally, is the answer to &sect;0. Five different values of <em>a</em> land on five different points along these two curves, and out come five different learning curves.</p>
+      <p>And that, finally, is the answer to &sect;0. Five different values of <em>a</em> change both the escape behavior and the spectral tail, and out come five different learning curves.</p>
     </section>
 
     <section id="closure">
@@ -560,7 +560,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
         </div>
       </figure>
 
-      <p>Slide <em>a</em> from 0 upward. At <em>a</em> = 0 all four curves lie on top of each other and the closure holds. By <em>a</em> = 1 they&rsquo;re clearly peeling apart, and by <em>a</em> = 2 they look like four genuinely different stories. That divergence is the whole reason this paper is hard.</p>
+      <p>Slide <em>a</em> from 0 upward. At <em>a</em> = 0 all four curves lie on top of each other and the closure holds. By <em>a</em> = 1 they&rsquo;re clearly peeling apart, and by <em>a</em> = 2 they look like four genuinely different stories. That divergence is the whole reason this paper needs an infinite-dimensional analysis. The main theorem then focuses on the power-law regime <em>a</em> &gt; 1.</p>
     </section>
 
     <section id="dashboard">
@@ -612,7 +612,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <p>Three things worth playing with:</p>
       <ol>
-        <li>Hold <em>a</em> fixed and slide time. Watch the dot in (u, s) trace along the same path you saw in &sect;2 while the vertical line in the time-series tracks where you are. The three phases come back as a feel: the dot lingers near the saddle, then sprints to the star, and then sits at (1, 1) while the MSE keeps falling.</li>
+        <li>Hold <em>a</em> fixed and slide time. Watch the dot in (u, s) trace along the same path you saw in &sect;2 while the vertical line in the time-series tracks where you are. The three phases come back as a feel: low alignment at the start, summary statistics moving toward the star, and then a long period where (u, s) barely move while the MSE keeps falling.</li>
         <li>Slide <em>a</em>. Phase I shrinks, Phase III grows, and the (u, s) trajectory bends a bit. The per-coordinate error chart on the right reshapes its head and tail.</li>
         <li>Pick a fixed time, say t = 10<sup>4</sup>, and slide <em>a</em>. Two trajectories at the exact same moment can be in completely different parts of training.</li>
       </ol>
@@ -625,7 +625,7 @@ nav.toc a:hover { color: var(--primary); border-color: var(--primary); }
 
       <p>Real neural networks trained on real data follow power-law scaling laws: error drops as a power of compute, dataset size, or model size, often with exponents that stay remarkably consistent across many orders of magnitude. Where those exponents come from, and how they relate to the structure of the data, has been a long-standing question.</p>
 
-      <p>For linear models and kernel methods we&rsquo;ve known the answer for years: the spectral decay of the kernel sets the exponents. What this paper does is push the same picture into a nonlinear, nonconvex setting with saddles and a sign-symmetric loss. And the trade-off you watched in &sect;5 isn&rsquo;t just a numerical observation. It falls out of the paper&rsquo;s analysis as a closed-form result, with explicit scaling exponents in <em>a</em>.</p>
+      <p>For linear models and kernel methods we&rsquo;ve known the answer for years: spectral decay controls the long-time learning behavior. What this paper does is push that kind of explanation into a nonlinear, nonconvex setting with saddles and a sign-symmetric loss. And the trade-off you watched in &sect;5 isn&rsquo;t just a numerical observation. It falls out of the paper&rsquo;s analysis: anisotropy can speed escape, while the same spectrum creates a slow spectral tail for MSE.</p>
 
       <p>Whether the same story carries over to deep neural networks is still open. But the shapes line up: long plateaus, sharp drops, slow power-law tails. The five training runs you saw at the top of the page are one rigorously understood instance of what scaling laws look like, and now you know exactly why they look that way.</p>
     </section>
